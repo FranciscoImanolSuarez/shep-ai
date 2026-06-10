@@ -57,12 +57,12 @@ export function MessageBubble({
 
   if (role === 'user') {
     return (
-      <div className="flex justify-end my-8 group">
-        <div className="max-w-[85%] sm:max-w-[80%]">
-          <div className="rounded-2xl rounded-tr-md bg-muted/70 dark:bg-muted px-4 py-3">
-            <div className="text-[15px] leading-relaxed whitespace-pre-wrap">{content}</div>
+      <div className="flex justify-end my-5 group">
+        <div className="max-w-[80%] sm:max-w-[70%] flex flex-col items-end">
+          <div className="rounded-2xl rounded-br-md bg-primary text-primary-foreground px-4 py-2.5 shadow-sm">
+            <div className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">{content}</div>
           </div>
-          <div className="flex justify-end items-center gap-2 mt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-2 mt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {timestamp && (
               <span className="text-[10px] text-muted-foreground font-mono">{timestamp}</span>
             )}
@@ -81,16 +81,18 @@ export function MessageBubble({
     )
   }
 
-  // assistant — Claude/ChatGPT style: no bubble, just content with subtle icon
+  // assistant — left-aligned bubble with avatar, mirroring the user side
   const parsed = parseModel(model)
   return (
-    <div className="flex gap-4 my-8 group">
-      <div className="size-7 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-1">
+    <div className="flex justify-start gap-3 my-5 group">
+      <div className="size-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-1">
         <SparklesIcon className="size-3.5 text-primary" strokeWidth={2} />
       </div>
-      <div className="flex-1 min-w-0 max-w-full overflow-hidden">
-        <div className="text-[15px] leading-relaxed prose-message">{content}</div>
-        <div className="flex items-center gap-3 mt-3 pt-2">
+      <div className="max-w-[85%] sm:max-w-[78%] min-w-0 flex flex-col items-start">
+        <div className="rounded-2xl rounded-tl-md bg-muted/60 dark:bg-muted/40 border border-border/60 px-4 py-2.5 overflow-hidden w-fit max-w-full">
+          <div className="text-[15px] leading-relaxed prose-message">{content}</div>
+        </div>
+        <div className="flex items-center gap-3 mt-1.5 pl-1 w-full">
           {timestamp && (
             <span className="text-[10px] text-muted-foreground font-mono">{timestamp}</span>
           )}
