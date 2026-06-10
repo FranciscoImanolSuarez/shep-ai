@@ -34,7 +34,7 @@ function JSONNode({ data, depth, maxDepth, collapsed }: NodeProps) {
   }
 
   if (typeof data === 'string') {
-    return <span className="text-green-600 dark:text-green-400">"{data}"</span>
+    return <span className="text-green-600 dark:text-green-400">&quot;{data}&quot;</span>
   }
 
   if (Array.isArray(data)) {
@@ -89,7 +89,7 @@ function JSONNode({ data, depth, maxDepth, collapsed }: NodeProps) {
           <span className="block pl-4">
             {entries.map(([key, value], i) => (
               <span key={key} className="block">
-                <span className="text-blue-500 dark:text-blue-400">"{key}"</span>
+                <span className="text-blue-500 dark:text-blue-400">&quot;{key}&quot;</span>
                 <span className="text-muted-foreground">: </span>
                 <JSONNode
                   data={value}

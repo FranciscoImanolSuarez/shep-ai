@@ -91,23 +91,30 @@ import { CronInput } from '@/components/shared/forms/CronInput'
 import { FileUpload } from '@/components/shared/forms/FileUpload'
 import { toast } from '@/components/shared/Toast'
 
+// ─── Static demo data (computed once at module load) ─────────────────────────
+
+const HEATMAP_DEMO_DATA = Array.from({ length: 84 }, (_, i) => {
+  const d = new Date()
+  d.setDate(d.getDate() - (83 - i))
+  return { date: d.toISOString().slice(0, 10), value: Math.floor(Math.random() * 20) }
+})
+
 // ─── Theme toggle ────────────────────────────────────────────────────────────
 
 function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'light'
+    const saved = localStorage.getItem('theme') as 'light' | 'dark' | null
+    return saved ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  })
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme') as 'light' | 'dark' | null
-    const initial =
-      saved ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    setTheme(initial)
-    document.documentElement.classList.toggle('dark', initial === 'dark')
-  }, [])
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  }, [theme])
 
   function toggle() {
     const next = theme === 'light' ? 'dark' : 'light'
     setTheme(next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
     localStorage.setItem('theme', next)
   }
 
@@ -602,7 +609,7 @@ export default function DesignPage() {
             <aside className="my-16 max-w-3xl mx-auto">
               <blockquote className="border-l-2 border-primary pl-6 py-2">
                 <p className="text-2xl font-semibold tracking-tight leading-snug text-foreground">
-                  "Tokens scale. Components compose. Patterns repeat."
+                  &quot;Tokens scale. Components compose. Patterns repeat.&quot;
                 </p>
                 <footer className="mt-4 flex items-center gap-2 text-xs font-mono text-muted-foreground">
                   <span className="uppercase tracking-widest">Design principles</span>
@@ -907,7 +914,7 @@ export default function DesignPage() {
                   <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
                     Pro tip
                   </p>
-                  <h4 className="text-lg font-semibold tracking-tight">Compose, don't customize.</h4>
+                  <h4 className="text-lg font-semibold tracking-tight">Compose, don&apos;t customize.</h4>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-2xl">
                     Prefer composing existing primitives over adding props. A{' '}
                     <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">Card</code>{' '}
@@ -1484,11 +1491,7 @@ export default function DesignPage() {
                 <div className="space-y-2">
                   <p className="text-xs font-mono text-muted-foreground">HeatMap · GitHub-style activity grid</p>
                   <HeatMap
-                    data={Array.from({ length: 84 }, (_, i) => {
-                      const d = new Date()
-                      d.setDate(d.getDate() - (83 - i))
-                      return { date: d.toISOString().slice(0, 10), value: Math.floor(Math.random() * 20) }
-                    })}
+                    data={HEATMAP_DEMO_DATA}
                     weeks={12}
                   />
                 </div>
@@ -1614,7 +1617,7 @@ export async function runAgent(prompt: string) {
                       role="assistant"
                       content={
                         <div className="space-y-3">
-                          <p>For GDPR compliance, you need to implement structured audit logging. Here's a minimal setup:</p>
+                          <p>For GDPR compliance, you need to implement structured audit logging. Here&apos;s a minimal setup:</p>
                           <CodeBlock
                             language="typescript"
                             code={`await auditLog.record({
@@ -2078,7 +2081,7 @@ export async function runAgent(prompt: string) {
                 <h2 className="text-4xl font-semibold tracking-tight">Ready to ship?</h2>
                 <p className="mt-4 text-base text-muted-foreground leading-relaxed">
                   The primitives are stable. The tokens are scoped. Build the next feature with
-                  what's here — and add to the system only when a pattern repeats.
+                  what&apos;s here — and add to the system only when a pattern repeats.
                 </p>
                 <div className="flex items-center justify-center gap-3 mt-8">
                   <a

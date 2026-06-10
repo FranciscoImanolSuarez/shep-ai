@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon } from 'lucide-react'
 import Link from 'next/link'
 import type { PublishedAgent } from '@/core/domain/entities/published-agent'
@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 
 export default function MarketplaceDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const pubId = params.pubId as string
 
   const [agent, setAgent] = useState<PublishedAgent | null>(null)

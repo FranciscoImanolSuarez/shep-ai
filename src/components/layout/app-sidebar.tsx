@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
@@ -156,9 +157,11 @@ export function AppSidebar({ user, workspacesEnabled = false }: AppSidebarProps)
         <DropdownMenu>
           <DropdownMenuTrigger className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors text-left">
             {user.image ? (
-              <img
+              <Image
                 src={user.image}
                 alt=""
+                width={28}
+                height={28}
                 className="size-7 rounded-full shrink-0"
               />
             ) : (

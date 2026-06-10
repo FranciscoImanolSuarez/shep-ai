@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useId, useState, useRef, useEffect } from 'react'
 import { XIcon, ChevronDownIcon, CheckIcon } from 'lucide-react'
 
 interface SelectOption {
@@ -21,6 +21,7 @@ export function MultiSelect({
   options,
   placeholder = 'Select...',
 }: MultiSelectProps) {
+  const listboxId = useId()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -54,6 +55,7 @@ export function MultiSelect({
         role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={listboxId}
         className="flex flex-wrap items-center gap-1.5 min-h-[36px] w-full rounded-md border border-input bg-background px-2 py-1.5 cursor-pointer hover:bg-muted/30 transition-colors"
       >
         {selectedOptions.length === 0 ? (
@@ -83,6 +85,7 @@ export function MultiSelect({
       {/* Dropdown */}
       {open && (
         <ul
+          id={listboxId}
           role="listbox"
           aria-multiselectable="true"
           className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg overflow-hidden max-h-56 overflow-y-auto p-1"

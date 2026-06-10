@@ -24,7 +24,8 @@ const FORMATS = [
 
 export function ExportButton({ conversationId }: ExportButtonProps) {
   const handleExport = (format: string) => {
-    window.location.href = `/api/conversations/${conversationId}/export?format=${format}`
+    const url = `/api/conversations/${conversationId}/export?format=${format}`
+    window.location.assign(url)
   }
 
   return (

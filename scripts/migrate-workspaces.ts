@@ -28,8 +28,6 @@ const {
   workspaceMembers,
   users,
   conversations,
-  agents,
-  documents,
 } = schema
 
 async function main() {

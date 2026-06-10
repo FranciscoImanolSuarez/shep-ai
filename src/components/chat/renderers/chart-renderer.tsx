@@ -93,7 +93,7 @@ function BarChart({ data, title, yLabel, xLabel }: Omit<ChartData, 'type'>) {
 }
 
 // --- Line Chart ---
-function LineChart({ data, title, yLabel, xLabel }: Omit<ChartData, 'type'>) {
+function LineChart({ data, title, xLabel }: Omit<ChartData, 'type'>) {
   const maxValue = Math.max(...data.map(d => d.value))
   const chartHeight = 200
   const chartWidth = Math.max(400, data.length * 60)
@@ -153,31 +153,41 @@ function LineChart({ data, title, yLabel, xLabel }: Omit<ChartData, 'type'>) {
   )
 }
 
-// --- Pie Chart ---
-function PieChart({ data, title }: Omit<ChartData, 'type'>) {
-  const total = data.reduce((sum, d) => sum + d.value, 0)
-  const cx = 140, cy = 130, r = 90
-
+// --- Pie slice computation (pure, outside component to avoid reassignment in render) ---
+function computePieSlices(
+  data: ChartData['data'],
+  total: number,
+  cx: number,
+  cy: number,
+  r: number,
+) {
   let cumAngle = -Math.PI / 2
-  const slices = data.map((d, i) => {
+  return data.map((d, i) => {
     const angle = total > 0 ? (d.value / total) * 2 * Math.PI : 0
     const startAngle = cumAngle
     cumAngle += angle
     const endAngle = cumAngle
-
     const x1 = cx + r * Math.cos(startAngle)
     const y1 = cy + r * Math.sin(startAngle)
     const x2 = cx + r * Math.cos(endAngle)
     const y2 = cy + r * Math.sin(endAngle)
     const largeArc = angle > Math.PI ? 1 : 0
-
     return {
       path: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`,
       color: getColor(i, d.color),
-      ...d,
+      label: d.label,
+      value: d.value,
       percentage: total > 0 ? Math.round((d.value / total) * 100) : 0,
     }
   })
+}
+
+// --- Pie Chart ---
+function PieChart({ data, title }: Omit<ChartData, 'type'>) {
+  const total = data.reduce((sum, d) => sum + d.value, 0)
+  const cx = 140, cy = 130, r = 90
+
+  const slices = computePieSlices(data, total, cx, cy, r)
 
   return (
     <svg viewBox="0 0 400 280" className="w-full max-w-full" style={{ maxHeight: 300 }}>

@@ -19,6 +19,22 @@ const CHART_COLORS = [
   'var(--color-chart-5)',
 ]
 
+function computeArcs(
+  segments: DonutSegment[],
+  total: number,
+  circumference: number,
+) {
+  let offset = 0
+  return segments.map((seg, i) => {
+    const pct = total === 0 ? 0 : seg.value / total
+    const dash = pct * circumference
+    const gap = circumference - dash
+    const rotation = (offset / total) * 360 - 90
+    offset += seg.value
+    return { ...seg, dash, gap, rotation, color: seg.color ?? CHART_COLORS[i % CHART_COLORS.length] }
+  })
+}
+
 export function Donut({
   segments,
   size = 120,
@@ -31,15 +47,7 @@ export function Donut({
   const r = (size - thickness) / 2
   const circumference = 2 * Math.PI * r
 
-  let offset = 0
-  const arcs = segments.map((seg, i) => {
-    const pct = total === 0 ? 0 : seg.value / total
-    const dash = pct * circumference
-    const gap = circumference - dash
-    const rotation = (offset / total) * 360 - 90
-    offset += seg.value
-    return { ...seg, dash, gap, rotation, color: seg.color ?? CHART_COLORS[i % CHART_COLORS.length] }
-  })
+  const arcs = computeArcs(segments, total, circumference)
 
   return (
     <div className="inline-flex flex-col items-center gap-3">

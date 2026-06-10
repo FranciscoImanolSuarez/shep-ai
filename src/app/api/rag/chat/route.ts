@@ -43,7 +43,6 @@ export async function POST(req: Request) {
   }
 
   const env = getEnv()
-  const { ragUseCase } = getContainer()
 
   // Get the last user message for RAG retrieval
   const lastUserMessage = [...messages]

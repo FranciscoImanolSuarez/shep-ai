@@ -44,8 +44,7 @@ export default function WorkflowRunsPage() {
 
   useEffect(() => {
     if (!id) return
-    setLoading(true)
-    setError(null)
+    let cancelled = false
 
     const fetchRuns = (): Promise<WorkflowRun[]> =>
       fetch(`/api/workflows/${id}/runs`).then((r) => {
@@ -58,11 +57,19 @@ export default function WorkflowRunsPage() {
       fetch(`/api/workflows/${id}`).then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([runsData, workflowData]) => {
+        if (cancelled) return
         setRuns(Array.isArray(runsData) ? runsData : [])
+        setError(null)
         if (workflowData?.name) setWorkflowName(workflowData.name)
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load runs'))
-      .finally(() => setLoading(false))
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load runs')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
   }, [id])
 
   // P2.2 — when WORKFLOW_EXECUTOR=inngest, POST /runs returns immediately with

@@ -55,7 +55,6 @@ export function ModelSelector({ value, onChange, disabled }: ModelSelectorProps)
     if (_cachedProviders !== null) return
 
     let cancelled = false
-    setLoading(true)
     fetch('/api/models')
       .then((r) => r.json())
       .then((data: ModelsResponse) => {

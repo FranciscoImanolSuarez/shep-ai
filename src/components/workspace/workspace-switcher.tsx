@@ -23,7 +23,7 @@ export function WorkspaceSwitcher({ initialWorkspaces = [], initialActiveId }: W
   const [workspaces, setWorkspaces] = useState<WorkspaceWithRole[]>(initialWorkspaces)
   const [activeId, setActiveId] = useState<string | undefined>(initialActiveId)
   const [pendingCount, setPendingCount] = useState(0)
-  const [isPending, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
   const router = useRouter()
 
   useEffect(() => {

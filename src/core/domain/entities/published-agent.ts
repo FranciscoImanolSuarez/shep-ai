@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import type { AgentConfig, AgentProvider } from './agent'
+import type { AgentProvider } from './agent'
 
 export interface AgentConfigSnapshot {
   model: string

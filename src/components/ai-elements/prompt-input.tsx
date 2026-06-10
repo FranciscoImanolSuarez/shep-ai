@@ -442,6 +442,7 @@ export type PromptInputActionAddScreenshotProps = ComponentProps<
 
 export const PromptInputActionAddScreenshot = ({
   label = "Take screenshot",
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- intercepted to prevent forwarding to DropdownMenuItem
   onSelect,
   ...props
 }: PromptInputActionAddScreenshotProps) => {
@@ -856,7 +857,9 @@ export const PromptInput = ({
       try {
         // Convert blob URLs to data URLs asynchronously
         const convertedFiles: FileUIPart[] = await Promise.all(
-          files.map(async ({ id: _id, ...item }) => {
+          files.map(async (file) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars -- intentional omit of `id` via destructuring
+            const { id, ...item } = file;
             if (item.url?.startsWith("blob:")) {
               const dataUrl = await convertBlobUrlToDataUrl(item.url);
               // If conversion failed, keep the original blob URL

@@ -6,8 +6,6 @@ import type { WorkflowStorePort } from '@/core/ports/out/workflow-store.port'
 import type { AgentPort, RunAgentInput } from '@/core/ports/in/agent.port'
 import type { AuditStorePort } from '@/core/ports/out/audit-store.port'
 import type { WorkflowDefinition } from '@/core/domain/entities/workflow-definition'
-import type { WorkflowRunStatus } from '@/core/domain/entities/workflow-run'
-import type { WorkflowRunNode } from '@/core/domain/entities/workflow-run-node'
 import type { WorkflowNode } from '@/core/domain/entities/workflow-node'
 import type { Message } from '@/core/domain/entities/message'
 import { topologicalSort } from './workflow-dag'
@@ -54,8 +52,8 @@ export class WorkflowRuntimeUseCase {
     let traceId: string | undefined
     let traceCtx: TraceContext | undefined
     let rootSpanId: string | undefined
-    let totalTokens = 0
-    let totalCostUsd = 0
+    const totalTokens = 0
+    const totalCostUsd = 0
     let lastFailedNodeId: string | undefined
 
     // T2.15: start trace for this workflow run
