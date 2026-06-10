@@ -62,7 +62,7 @@ function addCacheControl(messages: ModelMessage[], provider: AgentProvider): Mod
  * tool loop once cumulative (input + output) tokens across completed steps
  * cross `maxTokens`. Pair with `stepCountIs(N)` as a hard step cap.
  */
-function tokenBudgetCondition(maxTokens: number): StopCondition<ToolSet> {
+export function tokenBudgetCondition(maxTokens: number): StopCondition<ToolSet> {
   return ({ steps }) => {
     let used = 0
     for (const s of steps) {
