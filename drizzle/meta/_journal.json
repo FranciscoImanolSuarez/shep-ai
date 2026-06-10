@@ -8,6 +8,55 @@
       "when": 1775346225935,
       "tag": "0000_add-agents-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777220404583,
+      "tag": "0001_daily_risque",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777222278867,
+      "tag": "0002_material_azazel",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777222906454,
+      "tag": "0003_steady_squadron_sinister",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777224308716,
+      "tag": "0004_organic_gideon",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777224985461,
+      "tag": "0005_nappy_angel",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780008422030,
+      "tag": "0006_milky_silhouette",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781014910432,
+      "tag": "0007_add_mcp_servers",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
 
 interface IngestItem {
@@ -8,8 +9,27 @@ interface IngestItem {
 }
 
 export async function POST(req: Request) {
+  const session = await auth()
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const body = await req.json()
-  const { ragUseCase } = getContainer()
+  const { ragUseCase, knowledgeBaseUseCase } = getContainer()
+  const knowledgeBaseId = body.knowledgeBaseId as string | undefined
+
+  if (!knowledgeBaseId) {
+    return NextResponse.json(
+      { error: 'knowledgeBaseId is required' },
+      { status: 400 },
+    )
+  }
+
+  // Verify ownership
+  const kb = await knowledgeBaseUseCase.get(session.user.email, knowledgeBaseId)
+  if (!kb) {
+    return NextResponse.json({ error: 'Knowledge base not found' }, { status: 404 })
+  }
 
   // Support both single and batch ingest
   if (Array.isArray(body.documents)) {
@@ -27,6 +47,7 @@ export async function POST(req: Request) {
         ragUseCase.ingest({
           content: item.content,
           source: item.source,
+          knowledgeBaseId,
           metadata: item.metadata,
           chunkSize: body.chunkSize,
           chunkOverlap: body.chunkOverlap,
@@ -37,7 +58,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ documents: results })
   }
 
-  // Single document (backwards compatible)
+  // Single document
   const { content, source, metadata, chunkSize, chunkOverlap } = body as IngestItem & {
     chunkSize?: number
     chunkOverlap?: number
@@ -53,6 +74,7 @@ export async function POST(req: Request) {
   const document = await ragUseCase.ingest({
     content,
     source,
+    knowledgeBaseId,
     metadata,
     chunkSize,
     chunkOverlap,

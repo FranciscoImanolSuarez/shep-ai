@@ -1,0 +1,87 @@
+import { NextResponse } from 'next/server'
+import { eq } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
+import { getContainer } from '@/config/container'
+import { createDb } from '@/adapters/db/connection'
+import { documents } from '@/adapters/db/schema'
+
+export async function POST(req: Request) {
+  const session = await auth()
+
+  if (!session?.accessToken) {
+    return NextResponse.json(
+      { error: 'Not authenticated with Google' },
+      { status: 401 },
+    )
+  }
+
+  const { documentId } = (await req.json()) as { documentId: string }
+
+  if (!documentId) {
+    return NextResponse.json(
+      { error: 'documentId is required' },
+      { status: 400 },
+    )
+  }
+
+  // Look up the existing document to get the Drive file ID
+  const db = createDb()
+  const [doc] = await db
+    .select({ metadata: documents.metadata, knowledgeBaseId: documents.knowledgeBaseId })
+    .from(documents)
+    .where(eq(documents.id, documentId))
+    .limit(1)
+
+  if (!doc) {
+    return NextResponse.json(
+      { error: 'Document not found' },
+      { status: 404 },
+    )
+  }
+
+  const driveFileId = doc.metadata?.driveFileId as string | undefined
+
+  if (!driveFileId) {
+    return NextResponse.json(
+      { error: 'Document is not from Google Drive' },
+      { status: 400 },
+    )
+  }
+
+  if (!doc.knowledgeBaseId) {
+    return NextResponse.json(
+      { error: 'Document has no knowledge base; re-import it instead' },
+      { status: 400 },
+    )
+  }
+
+  const { ragUseCase, fileSource } = getContainer()
+
+  try {
+    // Delete old document and re-ingest
+    await ragUseCase.deleteDocument(documentId)
+
+    const file = await fileSource.fetchFileContent(
+      driveFileId,
+      session.accessToken,
+    )
+
+    const newDocument = await ragUseCase.ingest({
+      content: file.content,
+      source: `gdrive://${file.fileName}`,
+      knowledgeBaseId: doc.knowledgeBaseId,
+      metadata: {
+        driveFileId: file.externalId,
+        driveSource: true,
+        originalMimeType: file.mimeType,
+        importedAt: new Date().toISOString(),
+      },
+    })
+
+    return NextResponse.json({ document: newDocument })
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to sync from Drive'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}

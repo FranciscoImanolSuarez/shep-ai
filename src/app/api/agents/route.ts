@@ -9,7 +9,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { name, description, systemPrompt, model, provider, toolIds, config, metadata } = body
+  const { name, description, systemPrompt, model, provider, toolIds, config, metadata, knowledgeBaseId } = body
 
   if (!name || !model) {
     return NextResponse.json(
@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     toolIds,
     config,
     metadata,
+    knowledgeBaseId: knowledgeBaseId ?? null,
   })
 
   return NextResponse.json({ agent }, { status: 201 })

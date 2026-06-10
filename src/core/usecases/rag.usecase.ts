@@ -3,6 +3,7 @@ import type { Document, DocumentChunk } from '@/core/domain/entities/document'
 import type { IngestInput, QueryInput, RagPort, RagQueryResult } from '@/core/ports/in/rag.port'
 import type { AIProviderPort } from '@/core/ports/out/ai-provider.port'
 import type { VectorStorePort } from '@/core/ports/out/vector-store.port'
+import { rerankChunks } from '@/adapters/rag/cohere-reranker.adapter'
 
 export interface RagConfig {
   embeddingModel: string
@@ -36,11 +37,12 @@ export class RagUseCase implements RagPort {
       chunkIndex: index,
     }))
 
-    const document: Document = {
+    const document: Document & { knowledgeBaseId?: string } = {
       id: documentId,
       content: input.content,
       metadata: input.metadata ?? {},
       source: input.source,
+      knowledgeBaseId: input.knowledgeBaseId,
       createdAt: new Date(),
     }
 
@@ -57,11 +59,20 @@ export class RagUseCase implements RagPort {
       dimensions: this.config.embeddingDimensions,
     })
 
-    const results = await this.vectorStore.search(
+    const topK = input.topK ?? 5
+    // P1.5: overfetch by 3x so the reranker has candidates to choose from. Cap
+    // at 30 so we don't blow up the pgvector query or rerank token cost.
+    const overfetchK = Math.min(topK * 3, 30)
+
+    const candidates = await this.vectorStore.search(
       queryEmbedding,
-      input.topK ?? 5,
+      overfetchK,
       input.filter,
+      input.knowledgeBaseId,
     )
+
+    // P1.5: cross-encoder rerank when COHERE_API_KEY is set; pass-through otherwise.
+    const results = await rerankChunks(input.query, candidates, topK)
 
     const context = results
       .map((r) => r.chunk.content)

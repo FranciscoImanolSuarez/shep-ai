@@ -1,3 +1,8 @@
 export type { ChatPort, ChatInput } from './chat.port'
 export type { RagPort, IngestInput, QueryInput, RagQueryResult } from './rag.port'
 export type { AgentPort, RunAgentInput, CreateAgentInput, UpdateAgentInput } from './agent.port'
+export type { ScheduledAgentPort, CreateScheduleInput, UpdateScheduleInput, RunScheduleResult } from './scheduled-agent.port'
+export type { MarketplacePort, PublishInput, BrowseFilters, InstallInput, PushUpdateInput, RateInput, UnpublishInput } from './marketplace.port'
+export type { WorkspacePort, CreateWorkspaceInput, UpdateWorkspaceInput, InviteMemberInput } from './workspace.port'
+export type { ObservabilityPort } from './observability.port'
+export type { WorkflowPort, CreateWorkflowInput, UpdateWorkflowInput, RunWorkflowInput } from './workflow.port'

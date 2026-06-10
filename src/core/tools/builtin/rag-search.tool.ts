@@ -9,7 +9,7 @@ const inputSchema = z.object({
 
 type RagSearchInput = z.infer<typeof inputSchema>
 
-export function createRagSearchTool(ragPort: RagPort): AgentToolDefinition<RagSearchInput> {
+export function createRagSearchTool(ragPort: RagPort, knowledgeBaseId?: string): AgentToolDefinition<RagSearchInput> {
   return {
     id: 'rag-search',
     name: 'rag-search',
@@ -21,6 +21,7 @@ export function createRagSearchTool(ragPort: RagPort): AgentToolDefinition<RagSe
       const result = await ragPort.query({
         query: input.query,
         topK: input.topK,
+        knowledgeBaseId,
       })
       return {
         answer: result.answer,

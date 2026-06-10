@@ -6,8 +6,8 @@ export interface VectorSearchResult {
 }
 
 export interface VectorStorePort {
-  saveDocument(doc: Document): Promise<void>
+  saveDocument(doc: Document & { knowledgeBaseId?: string }): Promise<void>
   upsertChunks(chunks: DocumentChunk[]): Promise<void>
-  search(embedding: number[], topK: number, filter?: Record<string, unknown>): Promise<VectorSearchResult[]>
+  search(embedding: number[], topK: number, filter?: Record<string, unknown>, knowledgeBaseId?: string): Promise<VectorSearchResult[]>
   deleteByDocumentId(documentId: string): Promise<void>
 }

@@ -25,6 +25,8 @@ export interface AgentExecution {
   result?: string
   totalTokens: number
   parentExecutionId?: string
+  // Observability: links execution to a trace (nullable, set after trace start)
+  traceId?: string
   createdAt: Date
   completedAt?: Date
 }

@@ -3,6 +3,7 @@ import type { Document, DocumentChunk } from '@/core/domain/entities/document'
 export interface IngestInput {
   content: string
   source: string
+  knowledgeBaseId: string
   metadata?: Record<string, unknown>
   chunkSize?: number
   chunkOverlap?: number
@@ -13,6 +14,7 @@ export interface QueryInput {
   topK?: number
   filter?: Record<string, unknown>
   includeMetadata?: boolean
+  knowledgeBaseId?: string
 }
 
 export interface RagQueryResult {

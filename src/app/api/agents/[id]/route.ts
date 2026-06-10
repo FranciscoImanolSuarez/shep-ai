@@ -16,7 +16,7 @@ export async function GET(
   return NextResponse.json({ agent })
 }
 
-const ALLOWED_UPDATE_FIELDS = ['name', 'description', 'systemPrompt', 'model', 'provider', 'toolIds', 'config', 'metadata'] as const
+const ALLOWED_UPDATE_FIELDS = ['name', 'description', 'systemPrompt', 'model', 'provider', 'toolIds', 'config', 'metadata', 'knowledgeBaseId'] as const
 
 export async function PUT(
   req: Request,

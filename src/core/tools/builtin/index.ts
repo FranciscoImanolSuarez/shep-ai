@@ -1,3 +1,5 @@
 export { createRagSearchTool } from './rag-search.tool'
 export { getCurrentTimeTool } from './get-current-time.tool'
 export { webSearchTool } from './web-search.tool'
+export { createDelegateAgentTool } from './delegate-agent.tool'
+export type { DelegateAgentContext } from './delegate-agent.tool'

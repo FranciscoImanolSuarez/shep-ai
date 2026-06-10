@@ -19,6 +19,7 @@ export class AgentExecutionStoreAdapter implements AgentExecutionStorePort {
       result: execution.result ?? null,
       totalTokens: execution.totalTokens,
       parentExecutionId: execution.parentExecutionId ?? null,
+      traceId: execution.traceId ?? null,
       completedAt: execution.completedAt ?? null,
     }).returning()
 
@@ -41,12 +42,23 @@ export class AgentExecutionStoreAdapter implements AgentExecutionStorePort {
     return rows.map((r) => this.toDomain(r))
   }
 
+  async findByParentId(parentId: string): Promise<AgentExecution[]> {
+    const rows = await this.db
+      .select()
+      .from(agentExecutions)
+      .where(eq(agentExecutions.parentExecutionId, parentId))
+      .orderBy(desc(agentExecutions.createdAt))
+
+    return rows.map((r) => this.toDomain(r))
+  }
+
   async update(id: string, data: Partial<Omit<AgentExecution, 'id' | 'agentId' | 'createdAt'>>): Promise<AgentExecution> {
     const values: Record<string, unknown> = {}
     if (data.status !== undefined) values.status = data.status
     if (data.steps !== undefined) values.steps = data.steps as unknown[]
     if (data.result !== undefined) values.result = data.result
     if (data.totalTokens !== undefined) values.totalTokens = data.totalTokens
+    if (data.traceId !== undefined) values.traceId = data.traceId
     if (data.completedAt !== undefined) values.completedAt = data.completedAt
 
     const [row] = await this.db
@@ -69,6 +81,7 @@ export class AgentExecutionStoreAdapter implements AgentExecutionStorePort {
       result: row.result ?? undefined,
       totalTokens: row.totalTokens,
       parentExecutionId: row.parentExecutionId ?? undefined,
+      traceId: row.traceId ?? undefined,
       createdAt: row.createdAt,
       completedAt: row.completedAt ?? undefined,
     }
