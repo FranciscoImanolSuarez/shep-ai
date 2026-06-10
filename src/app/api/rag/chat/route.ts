@@ -75,6 +75,9 @@ export async function POST(req: Request) {
   const result = streamText({
     model: aiModel,
     messages: modelMessages,
+    onError({ error }) {
+      console.error(`[rag/chat] stream error (${env.AI_PROVIDER}):`, error)
+    },
     system: context
       ? `Answer the user's questions based on the following document context. If the context doesn't contain relevant information, say so clearly.\n\nDocument context:\n${context}`
       : 'No documents have been uploaded yet. Let the user know they need to upload documents first to use document-based chat.',

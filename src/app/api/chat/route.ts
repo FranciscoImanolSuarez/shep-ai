@@ -9,8 +9,10 @@ import { computeCost } from '@/core/domain/entities/audit-event'
 import {
   PROVIDER_DEFAULTS,
   getProviderForModel,
+  getAvailableProviders,
   type ProviderId,
 } from '@/config/models'
+import type { Env } from '@/config/env'
 
 /**
  * Resolves the effective provider for a given model id.
@@ -47,17 +49,30 @@ function buildProviderModel(provider: ProviderId, modelId: string) {
  *   3. PROVIDER_DEFAULTS[AI_PROVIDER]
  *
  * Cross-provider: if the resolved model belongs to a different provider than
- * AI_PROVIDER, we use that provider's SDK directly.
+ * AI_PROVIDER, we use that provider's SDK directly — but only when that
+ * provider has credentials configured. Conversations can carry a model from a
+ * provider that is no longer configured (e.g. a gpt-* model saved while an
+ * OpenAI key existed); calling it would error after the 200 response is sent
+ * and the stream would die silently. Fall back to the env provider instead.
  */
 function resolveModel(
   bodyModel: string | undefined,
   conversationModel: string | undefined,
-  envProvider: ProviderId,
+  env: Env,
 ): { modelId: string; provider: ProviderId } {
+  const envProvider = env.AI_PROVIDER as ProviderId
   const candidate = bodyModel || conversationModel || ''
 
   if (candidate) {
     const provider = resolveProviderForModel(candidate, envProvider)
+
+    if (provider !== envProvider && !getAvailableProviders(env).includes(provider)) {
+      console.warn(
+        `[chat] Model ${candidate} needs provider ${provider} which has no credentials configured — falling back to ${envProvider}:${PROVIDER_DEFAULTS[envProvider]}`,
+      )
+      return { modelId: PROVIDER_DEFAULTS[envProvider], provider: envProvider }
+    }
+
     // Warn if cross-provider
     if (provider !== envProvider) {
       console.warn(
@@ -143,7 +158,7 @@ export async function POST(req: Request) {
   const { modelId, provider: resolvedProvider } = resolveModel(
     bodyModel as string | undefined,
     conversationModel,
-    env.AI_PROVIDER as ProviderId,
+    env,
   )
 
   const aiModel = buildProviderModel(resolvedProvider, modelId)
@@ -223,6 +238,11 @@ export async function POST(req: Request) {
     model: aiModel,
     messages: toModelMessages(messages),
     system: parts.join('\n\n'),
+    // Without this, provider errors after the 200 response are swallowed and
+    // the client just sees an empty assistant message.
+    onError({ error }) {
+      console.error(`[chat] stream error (${resolvedProvider}:${modelId}):`, error)
+    },
     onFinish({ usage }) {
       if (!session?.user?.email) return
       const tokenCount = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0)
