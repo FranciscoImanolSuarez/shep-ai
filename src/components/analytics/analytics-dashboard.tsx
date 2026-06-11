@@ -3,6 +3,8 @@
 import { useState, useCallback } from 'react'
 import type { AuditAggregateResult, AuditTimeBucket } from '@/core/ports/out/audit-store.port'
 import { MetricCard } from '@/components/shared/MetricCard'
+import { Tabs } from '@/components/shared/Tabs'
+import { SectionDivider } from '@/components/shared/SectionDivider'
 
 type Period = '7d' | '30d' | '90d'
 
@@ -109,15 +111,15 @@ function LineChart({ data }: { data: AuditTimeBucket[] }) {
       ))}
 
       {/* Area fill */}
-      <path d={areaD} fill="oklch(0.6 0.22 250)" fillOpacity={0.08} />
+      <path d={areaD} fill="var(--primary)" fillOpacity={0.08} />
 
       {/* Line */}
-      <path d={pathD} fill="none" stroke="oklch(0.6 0.22 250)" strokeWidth={1.5} />
+      <path d={pathD} fill="none" stroke="var(--primary)" strokeWidth={1.5} />
 
       {/* Dots */}
       {points.length < 40 &&
         points.map((p) => (
-          <circle key={p.x} cx={p.x} cy={p.y} r={2} fill="oklch(0.6 0.22 250)" fillOpacity={0.9} />
+          <circle key={p.x} cx={p.x} cy={p.y} r={2} fill="var(--primary)" fillOpacity={0.9} />
         ))}
     </svg>
   )
@@ -151,7 +153,7 @@ function BarChart({ data }: { data: { label: string; value: number }[] }) {
 
         return (
           <g key={d.label}>
-            <rect x={bx} y={by} width={bw} height={bh} fill="oklch(0.6 0.22 250)" fillOpacity={0.7} rx={2} />
+            <rect x={bx} y={by} width={bw} height={bh} fill="var(--chart-1)" fillOpacity={0.7} rx={2} />
             <text
               x={bx + bw / 2}
               y={H - 6}
@@ -230,77 +232,82 @@ export function AnalyticsDashboard({ initial }: Props) {
   return (
     <div className={loading ? 'opacity-60 pointer-events-none' : ''}>
       {/* Period selector */}
-      <div className="flex items-center gap-2 mb-6">
-        {(['7d', '30d', '90d'] as Period[]).map((p) => (
-          <button
-            key={p}
-            onClick={() => handlePeriodChange(p)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-              period === p
-                ? 'bg-foreground text-background border-foreground'
-                : 'border-border text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {periodLabel(p)}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={period}
+        onValueChange={(v) => handlePeriodChange(v as Period)}
+        items={(['7d', '30d', '90d'] as Period[]).map((p) => ({
+          value: p,
+          label: periodLabel(p),
+        }))}
+      />
 
       {/* Metrics row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
         <MetricCard label="Total tokens" value={totalTokens.toLocaleString()} />
         <MetricCard label="Total cost (USD)" value={`$${totalCost.toFixed(4)}`} />
         <MetricCard label="Total events" value={totalEvents.toLocaleString()} />
         <MetricCard label="Avg tokens / event" value={avgTokens} />
       </div>
 
+      <SectionDivider label="Charts" align="left" />
+
       {/* Charts row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-        <div className="border border-border rounded-lg p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors">
           <p className="text-sm font-semibold mb-3">Token usage</p>
           <LineChart data={data?.timeSeries ?? []} />
         </div>
-        <div className="border border-border rounded-lg p-4">
+        <div className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors">
           <p className="text-sm font-semibold mb-3">Events by type</p>
           <BarChart data={eventBarData} />
         </div>
       </div>
 
+      <SectionDivider label="Top lists" align="left" />
+
       {/* Top lists row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Top agents */}
-        <div className="border border-border rounded-lg">
-          <p className="text-sm font-semibold p-4 border-b border-border">Top agents</p>
+        <div className="border border-border rounded-xl overflow-hidden hover:border-foreground/20 transition-colors">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider p-4 border-b border-border bg-muted/40">
+            Top agents
+          </p>
           {(data?.topAgents ?? []).length === 0 ? (
             <div className="p-4 text-sm text-muted-foreground text-center">No agent runs yet.</div>
           ) : (
-            data!.topAgents.map((agent) => (
-              <div
-                key={agent.agentId}
-                className="flex items-center justify-between px-4 py-2.5 border-b border-border last:border-0 text-[13px]"
-              >
-                <span className="truncate max-w-[60%]">{agent.name}</span>
-                <span className="text-muted-foreground shrink-0">{agent.runCount} runs</span>
-              </div>
-            ))
+            <div className="divide-y divide-border">
+              {data!.topAgents.map((agent) => (
+                <div
+                  key={agent.agentId}
+                  className="flex items-center justify-between px-4 py-2.5 text-[13px]"
+                >
+                  <span className="truncate max-w-[60%]">{agent.name}</span>
+                  <span className="text-muted-foreground shrink-0">{agent.runCount} runs</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
         {/* Top documents */}
-        <div className="border border-border rounded-lg">
-          <p className="text-sm font-semibold p-4 border-b border-border">Top documents (RAG)</p>
+        <div className="border border-border rounded-xl overflow-hidden hover:border-foreground/20 transition-colors">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider p-4 border-b border-border bg-muted/40">
+            Top documents (RAG)
+          </p>
           {(data?.topDocuments ?? []).length === 0 ? (
             <div className="p-4 text-sm text-muted-foreground text-center">No RAG queries yet.</div>
           ) : (
-            data!.topDocuments.map((doc) => (
-              <div
-                key={doc.source}
-                className="flex items-center justify-between px-4 py-2.5 border-b border-border last:border-0 text-[13px]"
-              >
-                <span className="truncate max-w-[60%]">{doc.source}</span>
-                <span className="text-muted-foreground shrink-0">{doc.queryCount} queries</span>
-              </div>
-            ))
+            <div className="divide-y divide-border">
+              {data!.topDocuments.map((doc) => (
+                <div
+                  key={doc.source}
+                  className="flex items-center justify-between px-4 py-2.5 text-[13px]"
+                >
+                  <span className="truncate max-w-[60%]">{doc.source}</span>
+                  <span className="text-muted-foreground shrink-0">{doc.queryCount} queries</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

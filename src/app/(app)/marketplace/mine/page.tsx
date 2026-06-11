@@ -10,7 +10,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { PageHeader, PageBody } from '@/components/shared/PageHeader'
+import { PageBody } from '@/components/shared/PageHeader'
+import { Hero } from '@/components/shared/Hero'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Badge } from '@/components/shared/Badge'
 import { Alert } from '@/components/shared/Alert'
@@ -78,19 +79,22 @@ export default function MyPublishedPage() {
   const backLink = (
     <Link
       href="/marketplace"
-      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
     >
-      <ArrowLeftIcon className="size-3" />
+      <ArrowLeftIcon className="size-3.5" strokeWidth={1.5} />
       Marketplace
     </Link>
   )
 
   return (
     <div className="flex-1 overflow-auto">
-      <PageHeader
-        title="My published agents"
+      <Hero
+        eyebrow="MARKETPLACE"
+        title="My publications"
         description="Manage versions and visibility of the agents you've published to the marketplace."
-        breadcrumb={backLink}
+        variant="default"
+        actions={backLink}
+        stats={agents.length > 0 ? [{ label: 'Published', value: agents.length }] : undefined}
       />
 
       <PageBody className="space-y-4">

@@ -11,6 +11,9 @@ import { ChevronLeftIcon, NetworkIcon } from 'lucide-react'
 import type { WorkflowDefinition } from '@/core/domain/entities/workflow-definition'
 import type { Workflow } from '@/core/domain/entities/workflow'
 import type { WorkflowCanvasProps } from '@/components/workflows/WorkflowCanvas'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { Spinner } from '@/components/shared/Spinner'
 
 // T2.28: dynamic import with ssr:false — xyflow never runs on the server
 const WorkflowCanvas = dynamic<WorkflowCanvasProps>(
@@ -105,20 +108,25 @@ export default function WorkflowEditPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-        Loading workflow…
+      <div className="flex-1 flex items-center justify-center">
+        <Spinner size="lg" />
       </div>
     )
   }
 
   if (error || !workflow) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3">
-        <NetworkIcon className="size-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{error ?? 'Workflow not found'}</p>
-        <Link href="/workflows" className="text-sm text-primary hover:underline">
-          Back to workflows
-        </Link>
+      <div className="flex-1 flex items-center justify-center p-6">
+        <EmptyState
+          icon={NetworkIcon}
+          title={error ?? 'Workflow not found'}
+          description="The workflow may have been deleted or you may not have access."
+          action={
+            <Button size="sm" render={<Link href="/workflows" />}>
+              Back to workflows
+            </Button>
+          }
+        />
       </div>
     )
   }
@@ -126,7 +134,7 @@ export default function WorkflowEditPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-background shrink-0">
+      <div className="flex items-center gap-3 px-6 py-3 border-b border-border bg-background shrink-0">
         <button
           onClick={() => router.push('/workflows')}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -154,12 +162,13 @@ export default function WorkflowEditPage() {
           </button>
         )}
         <div className="flex items-center gap-1.5 ml-auto">
-          <Link
-            href={`/workflows/${id}/runs`}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          <Button
+            variant="ghost"
+            size="sm"
+            render={<Link href={`/workflows/${id}/runs`} />}
           >
-            View runs →
-          </Link>
+            View runs
+          </Button>
         </div>
       </div>
 

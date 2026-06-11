@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon } from 'lucide-react'
+import { ChevronDownIcon, ChevronUpIcon, ArrowLeftIcon, DownloadIcon, StarIcon, TagIcon, WrenchIcon, SettingsIcon } from 'lucide-react'
 import Link from 'next/link'
 import type { PublishedAgent } from '@/core/domain/entities/published-agent'
 import { Button } from '@/components/ui/button'
+import { Hero } from '@/components/shared/Hero'
+import { PageBody } from '@/components/shared/PageHeader'
+import { StatCard } from '@/components/shared/StatCard'
+import { SectionDivider } from '@/components/shared/SectionDivider'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { Alert } from '@/components/shared/Alert'
 
 export default function MarketplaceDetailPage() {
   const params = useParams()
@@ -82,10 +88,25 @@ export default function MarketplaceDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 px-6 py-6">
-        <div className="h-8 w-48 bg-muted animate-pulse rounded mb-4" />
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />)}
+      <div className="flex-1 overflow-auto">
+        <div className="border-b border-border px-6 py-10">
+          <div className="max-w-7xl mx-auto space-y-3">
+            <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+            <div className="h-8 w-64 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-96 bg-muted animate-pulse rounded" />
+          </div>
+        </div>
+        <div className="px-6 py-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
+              ))}
+            </div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-40 bg-muted animate-pulse rounded-xl" />
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -93,153 +114,183 @@ export default function MarketplaceDetailPage() {
 
   if (!agent) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3">
-        <p className="text-sm text-muted-foreground">Agent not found.</p>
-        <Link href="/marketplace" className="text-xs text-primary hover:underline">Back to marketplace</Link>
+      <div className="flex-1 overflow-auto">
+        <PageBody className="pt-12">
+          <EmptyState
+            icon={ArrowLeftIcon}
+            title="Agent not found"
+            description="This agent may have been removed or the link is invalid."
+            action={
+              <Link
+                href="/marketplace"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors"
+              >
+                <ArrowLeftIcon className="size-3.5" />
+                Back to marketplace
+              </Link>
+            }
+          />
+        </PageBody>
       </div>
     )
   }
 
+  const backLink = (
+    <Link
+      href="/marketplace"
+      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <ArrowLeftIcon className="size-3.5" strokeWidth={1.5} />
+      Marketplace
+    </Link>
+  )
+
+  const installAction = installed ? (
+    <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-muted text-muted-foreground text-sm font-medium">
+      Installed
+    </span>
+  ) : (
+    <Button size="sm" onClick={handleInstall} disabled={installing}>
+      {installing ? 'Installing…' : 'Install'}
+    </Button>
+  )
+
   return (
-    <div className="flex-1 overflow-auto px-6 py-6 max-w-3xl">
-      {/* Back */}
-      <Link
-        href="/marketplace"
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6 transition-colors"
-      >
-        <ArrowLeftIcon className="size-3.5" strokeWidth={1.5} />
-        Marketplace
-      </Link>
+    <div className="flex-1 overflow-auto">
+      <Hero
+        eyebrow="MARKETPLACE"
+        title={agent.name}
+        description={
+          agent.description
+            ? `${agent.description} — Published by ${agent.publisherId} · v${agent.version} · ${agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}`
+            : `Published by ${agent.publisherId} · v${agent.version} · ${agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}`
+        }
+        variant="default"
+        actions={
+          <div className="flex items-center gap-2">
+            {backLink}
+            {installAction}
+          </div>
+        }
+      />
 
-      {/* Title */}
-      <div className="flex items-start justify-between gap-4 mb-2">
-        <div>
-          <h1 className="text-lg font-semibold">{agent.name}</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Published by <span className="font-medium">{agent.publisherId}</span>
-            {' · '}v{agent.version}
-            {' · '}
-            <span className="capitalize">{agent.category}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {installed ? (
-            <span className="text-xs px-3 py-1.5 rounded bg-muted text-muted-foreground font-medium">Installed</span>
-          ) : (
-            <Button size="sm" onClick={handleInstall} disabled={installing}>
-              {installing ? 'Installing…' : 'Install'}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-6">
-        <span>{agent.installCount} installs</span>
-        {agent.averageRating > 0 && (
-          <span className="flex items-center gap-0.5">
-            <span className="text-yellow-500">★</span>
-            {agent.averageRating.toFixed(1)}
-          </span>
+      <PageBody className="space-y-6">
+        {error && (
+          <Alert variant="danger" description={error} onDismiss={() => setError('')} />
         )}
-      </div>
 
-      {error && (
-        <p className="text-xs text-destructive mb-4">{error}</p>
-      )}
-
-      {/* Description */}
-      {agent.description && (
-        <div className="mb-6">
-          <h2 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Description</h2>
-          <p className="text-sm">{agent.description}</p>
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Installs" value={agent.installCount} icon={DownloadIcon} />
+          <StatCard
+            label="Rating"
+            value={agent.averageRating > 0 ? `${agent.averageRating.toFixed(1)} / 5` : '—'}
+            icon={StarIcon}
+          />
+          <StatCard label="Version" value={`v${agent.version}`} icon={TagIcon} />
+          <StatCard
+            label="Updated"
+            value={new Date(agent.updatedAt).toLocaleDateString()}
+            icon={SettingsIcon}
+          />
         </div>
-      )}
 
-      {/* Tags */}
-      {agent.tags.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Tags</h2>
-          <div className="flex flex-wrap gap-1">
-            {agent.tags.map((tag) => (
-              <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                {tag}
-              </span>
-            ))}
+        {/* Description */}
+        {agent.description && (
+          <div className="rounded-xl border border-border p-5">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">Description</p>
+            <p className="text-sm leading-relaxed">{agent.description}</p>
+          </div>
+        )}
+
+        {/* Tags */}
+        {agent.tags.length > 0 && (
+          <div className="rounded-xl border border-border p-5">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">Tags</p>
+            <div className="flex flex-wrap gap-1">
+              {agent.tags.map((tag) => (
+                <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tools */}
+        {agent.toolIdsSnapshot.length > 0 && (
+          <div className="rounded-xl border border-border p-5">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
+              <WrenchIcon className="size-3 inline mr-1" />
+              Tools
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {agent.toolIdsSnapshot.map((tool) => (
+                <span key={tool} className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground font-mono">
+                  {tool}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Config snapshot */}
+        <div className="rounded-xl border border-border p-5">
+          <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">Config</p>
+          <div className="text-xs text-muted-foreground space-y-1 grid grid-cols-2 gap-2">
+            <p>Model: <span className="text-foreground font-medium">{agent.configSnapshot.model}</span></p>
+            <p>Provider: <span className="text-foreground">{agent.configSnapshot.provider}</span></p>
+            <p>Temperature: <span className="text-foreground">{agent.configSnapshot.temperature}</span></p>
+            <p>Max steps: <span className="text-foreground">{agent.configSnapshot.maxSteps}</span></p>
           </div>
         </div>
-      )}
 
-      {/* Tools */}
-      {agent.toolIdsSnapshot.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Tools</h2>
-          <div className="flex flex-wrap gap-1">
-            {agent.toolIdsSnapshot.map((tool) => (
-              <span key={tool} className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground font-mono">
-                {tool}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Config snapshot */}
-      <div className="mb-6">
-        <h2 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Config</h2>
-        <div className="text-xs text-muted-foreground space-y-1 bg-muted/30 rounded-lg p-3">
-          <p>Model: <span className="text-foreground font-medium">{agent.configSnapshot.model}</span></p>
-          <p>Provider: <span className="text-foreground">{agent.configSnapshot.provider}</span></p>
-          <p>Temperature: <span className="text-foreground">{agent.configSnapshot.temperature}</span></p>
-          <p>Max steps: <span className="text-foreground">{agent.configSnapshot.maxSteps}</span></p>
-        </div>
-      </div>
-
-      {/* System prompt (collapsible) */}
-      {agent.systemPromptSnapshot && (
-        <div className="mb-6">
-          <button
-            onClick={() => setPromptOpen(!promptOpen)}
-            className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors mb-2"
-          >
-            System Prompt
-            {promptOpen ? (
-              <ChevronUpIcon className="size-3.5" strokeWidth={1.5} />
-            ) : (
-              <ChevronDownIcon className="size-3.5" strokeWidth={1.5} />
+        {/* System prompt (collapsible) */}
+        {agent.systemPromptSnapshot && (
+          <div className="rounded-xl border border-border p-5">
+            <button
+              onClick={() => setPromptOpen(!promptOpen)}
+              className="flex items-center gap-2 text-[10px] font-mono tracking-widest text-muted-foreground uppercase hover:text-foreground transition-colors mb-2 w-full text-left"
+            >
+              System Prompt
+              {promptOpen ? (
+                <ChevronUpIcon className="size-3.5 ml-auto" strokeWidth={1.5} />
+              ) : (
+                <ChevronDownIcon className="size-3.5 ml-auto" strokeWidth={1.5} />
+              )}
+            </button>
+            {promptOpen && (
+              <pre className="text-xs bg-muted/30 rounded-lg p-3 whitespace-pre-wrap max-h-64 overflow-auto mt-2">
+                {agent.systemPromptSnapshot}
+              </pre>
             )}
-          </button>
-          {promptOpen && (
-            <pre className="text-xs bg-muted/30 rounded-lg p-3 whitespace-pre-wrap max-h-64 overflow-auto">
-              {agent.systemPromptSnapshot}
-            </pre>
-          )}
-        </div>
-      )}
-
-      {/* Rate */}
-      <div className="border-t border-border pt-6">
-        <h2 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Rate this agent</h2>
-        {ratingDone ? (
-          <p className="text-xs text-muted-foreground">Thanks for rating!</p>
-        ) : (
-          <div className="flex items-center gap-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                onClick={() => handleRate(star)}
-                disabled={ratingSubmitting}
-                className={`text-xl transition-colors hover:text-yellow-500 ${
-                  star <= rating ? 'text-yellow-500' : 'text-muted-foreground'
-                } disabled:opacity-40`}
-              >
-                ★
-              </button>
-            ))}
-            {ratingSubmitting && <span className="text-xs text-muted-foreground ml-2">Saving…</span>}
           </div>
         )}
-      </div>
+
+        {/* Rate this agent */}
+        <SectionDivider label="Rate this agent" align="left" />
+        <div className="rounded-xl border border-border p-5">
+          {ratingDone ? (
+            <p className="text-sm text-muted-foreground">Thanks for rating!</p>
+          ) : (
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => handleRate(star)}
+                  disabled={ratingSubmitting}
+                  className={`text-xl transition-colors hover:text-yellow-500 ${
+                    star <= rating ? 'text-yellow-500' : 'text-muted-foreground'
+                  } disabled:opacity-40`}
+                >
+                  ★
+                </button>
+              ))}
+              {ratingSubmitting && <span className="text-xs text-muted-foreground ml-2">Saving…</span>}
+            </div>
+          )}
+        </div>
+      </PageBody>
     </div>
   )
 }

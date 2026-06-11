@@ -13,7 +13,7 @@ export function AgentCard({ agent, install, onInstall, installing }: AgentCardPr
   const hasUpdate = install && install.installedVersion < install.latestVersion
 
   return (
-    <div className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-colors flex flex-col gap-3">
+    <div className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors flex flex-col gap-3">
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -73,7 +73,7 @@ export function AgentCard({ agent, install, onInstall, installing }: AgentCardPr
             <button
               onClick={() => onInstall?.(agent.id)}
               disabled={installing}
-              className="text-[10px] px-2.5 py-1 rounded bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+              className="text-[10px] px-2.5 py-1 rounded-md bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
             >
               {installing ? 'Installing…' : 'Install'}
             </button>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, use } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+
 import {
   TrashIcon,
   FileTextIcon,
@@ -11,14 +11,20 @@ import {
   FileJsonIcon,
   FileCodeIcon,
   ArrowLeftIcon,
+  LayersIcon,
+  CalendarIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/shared/Badge'
 import { GoogleDrivePicker } from '@/components/drive/google-drive-picker'
-import { PageHeader, PageBody } from '@/components/shared/PageHeader'
+import { Hero } from '@/components/shared/Hero'
+import { PageBody } from '@/components/shared/PageHeader'
+import { StatCard } from '@/components/shared/StatCard'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { FileUpload } from '@/components/shared/forms/FileUpload'
 import { Alert } from '@/components/shared/Alert'
 import { toast } from '@/components/shared/Toast'
+import { Spinner } from '@/components/shared/Spinner'
+import { Button } from '@/components/ui/button'
 
 interface KnowledgeBase {
   id: string
@@ -75,7 +81,6 @@ function formatTokens(n: number): string {
 
 export default function KnowledgeBaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const router = useRouter()
   const { data: session } = useSession()
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
   const [stats, setStats] = useState<KbStats | null>(null)
@@ -156,19 +161,15 @@ export default function KnowledgeBaseDetailPage({ params }: { params: Promise<{ 
   if (notFound) {
     return (
       <div className="flex-1 overflow-auto">
-        <PageHeader title="Knowledge base not found" />
         <PageBody>
           <EmptyState
             icon={FileTextIcon}
             title="This knowledge base doesn't exist"
             description="It may have been deleted, or you don't have access to it."
             action={
-              <Link
-                href="/knowledge-bases"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors"
-              >
+              <Button size="sm" render={<Link href="/knowledge-bases" />}>
                 Back to knowledge bases
-              </Link>
+              </Button>
             }
           />
         </PageBody>
@@ -176,44 +177,52 @@ export default function KnowledgeBaseDetailPage({ params }: { params: Promise<{ 
     )
   }
 
-  const breadcrumb = (
-    <button
-      onClick={() => router.push('/knowledge-bases')}
-      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+  const backAction = (
+    <Button
+      variant="ghost"
+      size="sm"
+      render={<Link href="/knowledge-bases" />}
     >
-      <ArrowLeftIcon className="size-3" />
+      <ArrowLeftIcon className="size-3.5" />
       All knowledge bases
-    </button>
+    </Button>
   )
 
   return (
     <div className="flex-1 overflow-auto">
-      <PageHeader
-        title={kb?.name ?? (loading ? 'Loading…' : 'Knowledge base')}
+      <Hero
+        eyebrow="KNOWLEDGE"
+        title={kb?.name ?? (loading ? '' : 'Knowledge base')}
         description={kb?.description || 'Documents in this knowledge base power RAG queries from agents.'}
-        breadcrumb={breadcrumb}
+        variant="default"
+        actions={backAction}
+        stats={stats ? [
+          { label: 'Documents', value: stats.docCount },
+          { label: 'Est. tokens', value: `~${formatTokens(stats.estimatedTokens)}` },
+        ] : undefined}
       />
 
       <PageBody className="space-y-6">
         {/* Stats row */}
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="rounded-xl border border-border bg-card px-4 py-3">
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Documents</p>
-              <p className="text-xl font-semibold tabular-nums mt-1">{stats.docCount}</p>
-            </div>
-            <div className="rounded-xl border border-border bg-card px-4 py-3">
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tokens</p>
-              <p className="text-xl font-semibold tabular-nums mt-1">~{formatTokens(stats.estimatedTokens)}</p>
-            </div>
-            <div className="rounded-xl border border-border bg-card px-4 py-3">
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Last upload</p>
-              <p className="text-sm font-medium mt-1">
-                {stats.lastIngestedAt
-                  ? new Date(stats.lastIngestedAt).toLocaleDateString()
-                  : 'Never'}
-              </p>
-            </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              label="Documents"
+              value={stats.docCount}
+              icon={FileTextIcon}
+            />
+            <StatCard
+              label="Est. tokens"
+              value={`~${formatTokens(stats.estimatedTokens)}`}
+              icon={LayersIcon}
+            />
+            <StatCard
+              label="Last upload"
+              value={stats.lastIngestedAt
+                ? new Date(stats.lastIngestedAt).toLocaleDateString()
+                : 'Never'}
+              icon={CalendarIcon}
+            />
           </div>
         )}
 
@@ -224,10 +233,15 @@ export default function KnowledgeBaseDetailPage({ params }: { params: Promise<{ 
 
         {/* Upload area */}
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold">Upload documents</h2>
-          {uploading && (
-            <p className="text-xs text-muted-foreground">Uploading…</p>
-          )}
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold">Upload documents</h2>
+            {uploading && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Spinner size="sm" />
+                Uploading…
+              </span>
+            )}
+          </div>
           <FileUpload
             onFiles={handleFiles}
             accept=".txt,.md,.csv,.json,.xml,.html"

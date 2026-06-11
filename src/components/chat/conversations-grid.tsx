@@ -34,9 +34,9 @@ function parseProvider(model?: string): { provider: Provider; name: string } | n
 }
 
 const PROVIDER_BG: Record<Provider, string> = {
-  openai: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
-  anthropic: 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/20',
-  ollama: 'bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/20',
+  openai: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20',
+  anthropic: 'bg-orange-500/15 text-orange-600 border-orange-500/20',
+  ollama: 'bg-violet-500/15 text-violet-600 border-violet-500/20',
 }
 const PROVIDER_INITIAL: Record<Provider, string> = {
   openai: 'O',
@@ -286,7 +286,7 @@ export function ConversationsGrid({ conversations: initial }: ConversationsGridP
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search conversations…"
-            className="w-full h-11 pl-10 pr-24 rounded-xl border border-border bg-card text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground/40 focus:shadow-[0_0_0_3px_rgba(0,112,243,0.08)] transition-all"
+            className="w-full h-11 pl-10 pr-24 rounded-xl border border-border bg-card text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground/40 focus-visible:ring-2 focus-visible:ring-ring/50 transition-all"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
             {query ? (
@@ -313,8 +313,8 @@ export function ConversationsGrid({ conversations: initial }: ConversationsGridP
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card/50 py-20 text-center">
-          <div className="inline-flex items-center justify-center size-12 rounded-2xl bg-muted mb-4">
+        <div className="rounded-xl border border-dashed border-border bg-card/50 py-20 text-center">
+          <div className="inline-flex items-center justify-center size-12 rounded-xl bg-muted mb-4">
             <SearchIcon className="size-5 text-muted-foreground/60" />
           </div>
           <p className="text-base font-semibold mb-1">
@@ -359,7 +359,7 @@ export function ConversationsGrid({ conversations: initial }: ConversationsGridP
                   </div>
 
                   {/* Linear rows */}
-                  <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden">
+                  <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
                     {group.items.map((conv) => (
                       <ConversationRow
                         key={conv.id}

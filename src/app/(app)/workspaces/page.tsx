@@ -12,6 +12,9 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import type { WorkspaceWithRole } from '@/core/domain/entities/workspace'
+import { Hero } from '@/components/shared/Hero'
+import { PageBody } from '@/components/shared/PageHeader'
+import { EmptyState } from '@/components/shared/EmptyState'
 
 export default function WorkspacesPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceWithRole[]>([])
@@ -50,35 +53,55 @@ export default function WorkspacesPage() {
     }
   }
 
-  return (
-    <>
-      <div className="h-14 px-6 border-b border-border flex items-center justify-between shrink-0">
-        <span className="text-sm font-semibold tracking-tight">Workspaces</span>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <PlusIcon />
-          New workspace
-        </Button>
-      </div>
+  const createButton = (
+    <button
+      onClick={() => setCreateOpen(true)}
+      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-foreground text-background text-sm font-medium shadow-sm hover:bg-foreground/90 transition-colors"
+    >
+      <PlusIcon className="size-4" />
+      New workspace
+    </button>
+  )
 
-      <div className="flex-1 overflow-auto px-6 py-6 space-y-2">
+  return (
+    <div className="flex-1 overflow-auto">
+      <Hero
+        eyebrow="TEAM"
+        title="Workspaces"
+        description="Organize your team, manage members, and control access per workspace."
+        variant="default"
+        actions={createButton}
+        stats={workspaces.length > 0 ? [{ label: 'Total', value: workspaces.length }] : undefined}
+      />
+
+      <PageBody className="space-y-2">
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+              <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />
             ))}
           </div>
         ) : workspaces.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <BuildingIcon className="size-8 text-muted-foreground" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">No workspaces yet.</p>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>Create your first workspace</Button>
-          </div>
+          <EmptyState
+            icon={BuildingIcon}
+            title="No workspaces yet"
+            description="Create your first workspace to collaborate with your team."
+            action={
+              <button
+                onClick={() => setCreateOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                <PlusIcon className="size-3.5" />
+                Create workspace
+              </button>
+            }
+          />
         ) : (
           workspaces.map((ws) => (
             <Link
               key={ws.id}
               href={`/workspaces/${ws.id}`}
-              className="flex items-center justify-between px-4 py-3.5 rounded-lg border border-border hover:bg-muted/30 transition-colors group"
+              className="flex items-center justify-between px-4 py-3.5 rounded-xl border border-border hover:border-foreground/20 hover:bg-muted/30 transition-colors group"
             >
               <div>
                 <p className="text-sm font-medium">{ws.name}</p>
@@ -92,7 +115,7 @@ export default function WorkspacesPage() {
             </Link>
           ))
         )}
-      </div>
+      </PageBody>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
@@ -117,6 +140,6 @@ export default function WorkspacesPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }

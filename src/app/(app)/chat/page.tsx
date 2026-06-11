@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { NewChatButton } from '@/components/chat/chat-actions'
 import { ConversationsGrid } from '@/components/chat/conversations-grid'
+import { PageBody } from '@/components/shared/PageHeader'
 
 interface StarterPrompt {
   label: string
@@ -28,28 +29,28 @@ const STARTERS: StarterPrompt[] = [
     title: 'Draft something',
     prompt: 'Help me write a clear, concise product update for our team.',
     icon: PenLineIcon,
-    accent: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    accent: 'bg-blue-500/15 text-blue-600',
   },
   {
     label: 'EXPLAIN',
     title: 'Break it down',
     prompt: 'Explain the concept of vector embeddings as if I were new to ML.',
     icon: BookOpenIcon,
-    accent: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    accent: 'bg-emerald-500/15 text-emerald-600',
   },
   {
     label: 'CODE',
     title: 'Review my code',
     prompt: 'Review this snippet and suggest improvements with reasoning.',
     icon: CodeIcon,
-    accent: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+    accent: 'bg-violet-500/15 text-violet-600',
   },
   {
     label: 'RESEARCH',
     title: 'Find something',
     prompt: 'Summarize the latest thinking on agent orchestration patterns.',
     icon: SearchIcon,
-    accent: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    accent: 'bg-amber-500/15 text-amber-600',
   },
 ]
 
@@ -79,7 +80,7 @@ export default async function ChatPage() {
             backgroundSize: '28px 28px',
           }}
         />
-        <div className="relative px-6 sm:px-10 pt-16 pb-20 max-w-7xl mx-auto">
+        <div className="relative px-6 pt-16 pb-20 max-w-7xl mx-auto">
           {/* Date + meta row */}
           <div className="flex items-center gap-3 mb-10 flex-wrap">
             <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
@@ -124,46 +125,48 @@ export default async function ChatPage() {
       </section>
 
       {/* STARTERS — Cohere card grid */}
-      <section className="px-6 sm:px-10 py-16 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-10">
-          <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-            Start something
-          </span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {STARTERS.map((starter) => {
-            const Icon = starter.icon
-            return (
-              <Link
-                key={starter.label}
-                href={`/chat?prompt=${encodeURIComponent(starter.prompt)}`}
-                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 hover:border-foreground/30 transition-all flex flex-col gap-4 min-h-[180px]"
-              >
-                <div className={`size-10 rounded-xl flex items-center justify-center ${starter.accent}`}>
-                  <Icon className="size-5" strokeWidth={2} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
-                    {starter.label}
-                  </p>
-                  <h3 className="text-base font-semibold tracking-tight group-hover:text-primary transition-colors">
-                    {starter.title}
-                  </h3>
-                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                    {starter.prompt}
-                  </p>
-                </div>
-                <ArrowUpRightIcon className="absolute top-5 right-5 size-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-              </Link>
-            )
-          })}
-        </div>
+      <section>
+        <PageBody className="py-16">
+          <div className="flex items-center gap-4 mb-10">
+            <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
+              Start something
+            </span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {STARTERS.map((starter) => {
+              const Icon = starter.icon
+              return (
+                <Link
+                  key={starter.label}
+                  href={`/chat?prompt=${encodeURIComponent(starter.prompt)}`}
+                  className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 hover:border-foreground/30 transition-all flex flex-col gap-4 min-h-[180px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  <div className={`size-10 rounded-xl flex items-center justify-center ${starter.accent}`}>
+                    <Icon className="size-5" strokeWidth={2} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
+                      {starter.label}
+                    </p>
+                    <h3 className="text-base font-semibold tracking-tight group-hover:text-primary transition-colors">
+                      {starter.title}
+                    </h3>
+                    <p className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                      {starter.prompt}
+                    </p>
+                  </div>
+                  <ArrowUpRightIcon className="absolute top-5 right-5 size-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                </Link>
+              )
+            })}
+          </div>
+        </PageBody>
       </section>
 
       {/* EDITORIAL CALLOUT */}
       <section className="border-y border-border bg-muted/30">
-        <div className="px-6 sm:px-10 py-16 max-w-4xl mx-auto text-center">
+        <div className="px-6 py-16 max-w-4xl mx-auto text-center">
           <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-5">
             Tip
           </p>
@@ -176,49 +179,51 @@ export default async function ChatPage() {
       </section>
 
       {/* RECENT — grid of conversation cards */}
-      <section className="px-6 sm:px-10 py-16 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-            Recent
-          </span>
-          <div className="flex-1 h-px bg-border" />
-          {conversations.length > 0 && (
+      <section>
+        <PageBody className="py-16">
+          <div className="flex items-center gap-4 mb-8">
             <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-              {conversations.length} {conversations.length === 1 ? 'thread' : 'threads'}
+              Recent
             </span>
-          )}
-        </div>
+            <div className="flex-1 h-px bg-border" />
+            {conversations.length > 0 && (
+              <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
+                {conversations.length} {conversations.length === 1 ? 'thread' : 'threads'}
+              </span>
+            )}
+          </div>
 
-        {conversations.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card overflow-hidden">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10">
-              <div>
-                <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
-                  No history yet
-                </p>
-                <h2 className="text-3xl font-semibold tracking-tight">
-                  Your first chat starts now.
-                </h2>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  Every conversation persists automatically. Search, filter by date, or pick up exactly where you left off.
-                </p>
-                <div className="mt-6">
-                  <NewChatButton />
+          {conversations.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-10">
+                <div>
+                  <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
+                    No history yet
+                  </p>
+                  <h2 className="text-3xl font-semibold tracking-tight">
+                    Your first chat starts now.
+                  </h2>
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                    Every conversation persists automatically. Search, filter by date, or pick up exactly where you left off.
+                  </p>
+                  <div className="mt-6">
+                    <NewChatButton />
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-center">
-                <div className="relative size-40">
-                  <div className="absolute inset-0 rounded-full bg-primary/10 blur-2xl" />
-                  <div className="relative size-full rounded-full bg-background border border-border flex items-center justify-center">
-                    <MessageSquareIcon className="size-12 text-primary/60" strokeWidth={1.5} />
+                <div className="flex items-center justify-center">
+                  <div className="relative size-40">
+                    <div className="absolute inset-0 rounded-full bg-primary/10 blur-2xl" />
+                    <div className="relative size-full rounded-full bg-background border border-border flex items-center justify-center">
+                      <MessageSquareIcon className="size-12 text-primary/60" strokeWidth={1.5} />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <ConversationsGrid conversations={conversations} />
-        )}
+          ) : (
+            <ConversationsGrid conversations={conversations} />
+          )}
+        </PageBody>
       </section>
 
       {/* CLOSING BAND — Cohere editorial */}
@@ -230,7 +235,7 @@ export default async function ChatPage() {
             backgroundSize: '24px 24px',
           }}
         />
-        <div className="relative px-6 sm:px-10 py-16 max-w-7xl mx-auto">
+        <div className="relative px-6 py-16 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Link href="/agents" className="group block">
               <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">

@@ -2,25 +2,24 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { ActivityIcon, ChevronLeftIcon } from 'lucide-react'
+import { ActivityIcon, ChevronLeftIcon, ClockIcon, DollarSignIcon, HashIcon, ZapIcon } from 'lucide-react'
 import Link from 'next/link'
 import { TraceTimeline } from '@/components/observability/TraceTimeline'
 import { SpanTree } from '@/components/observability/SpanTree'
 import type { Trace, TraceStatus } from '@/core/domain/entities/trace'
 import type { Span } from '@/core/domain/entities/span'
 import { Tabs } from '@/components/shared/Tabs'
+import { Badge } from '@/components/shared/Badge'
+import { StatCard } from '@/components/shared/StatCard'
+import { EmptyState } from '@/components/shared/EmptyState'
 
 function StatusBadge({ status }: { status: TraceStatus }) {
-  const map: Record<TraceStatus, string> = {
-    running: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    ok: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    error: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  const variantMap: Record<TraceStatus, 'warning' | 'success' | 'danger'> = {
+    running: 'warning',
+    ok: 'success',
+    error: 'danger',
   }
-  return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${map[status]}`}>
-      {status}
-    </span>
-  )
+  return <Badge variant={variantMap[status]}>{status}</Badge>
 }
 
 function formatDuration(ms?: number): string {
@@ -74,20 +73,42 @@ export default function TraceDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-        Loading trace…
+      <div className="flex-1 overflow-auto">
+        <div className="border-b border-border px-6 py-10">
+          <div className="max-w-7xl mx-auto space-y-3">
+            <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+            <div className="h-8 w-64 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-96 bg-muted animate-pulse rounded" />
+          </div>
+        </div>
+        <div className="px-6 py-6">
+          <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
 
   if (error || !trace) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3">
-        <ActivityIcon className="size-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{error ?? 'Trace not found'}</p>
-        <Link href="/observability" className="text-sm text-primary hover:underline">
-          Back to traces
-        </Link>
+      <div className="flex-1 overflow-auto p-6">
+        <EmptyState
+          icon={ActivityIcon}
+          title={error ?? 'Trace not found'}
+          description="The trace you're looking for doesn't exist or could not be loaded."
+          action={
+            <Link
+              href="/observability"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-foreground text-background text-sm font-medium shadow-sm hover:bg-foreground/90 transition-colors"
+            >
+              <ChevronLeftIcon className="size-4" />
+              Back to traces
+            </Link>
+          }
+        />
       </div>
     )
   }
@@ -106,45 +127,43 @@ export default function TraceDetailPage() {
           </Link>
         </div>
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <h1 className="font-mono text-sm font-semibold">{trace.id}</h1>
               <StatusBadge status={trace.status} />
-              <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
-                trace.rootKind === 'agent'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                  : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-              }`}>
+              <Badge variant={trace.rootKind === 'agent' ? 'info' : 'warning'}>
                 {trace.rootKind}
-              </span>
+              </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
               Started {new Date(trace.startedAt).toLocaleString()}
             </p>
           </div>
+        </div>
 
-          {/* Metrics */}
-          <div className="flex gap-6 text-right">
-            <div>
-              <p className="text-xs text-muted-foreground">Duration</p>
-              <p className="text-sm font-medium">{formatDuration(trace.durationMs)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total tokens</p>
-              <p className="text-sm font-medium">
-                {(trace.totalInputTokens + trace.totalOutputTokens).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Cost</p>
-              <p className="text-sm font-medium">{formatCost(trace.totalCostUsd)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Spans</p>
-              <p className="text-sm font-medium">{trace.spanCount}</p>
-            </div>
-          </div>
+        {/* Metrics grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+          <StatCard
+            label="Duration"
+            value={formatDuration(trace.durationMs)}
+            icon={ClockIcon}
+          />
+          <StatCard
+            label="Total tokens"
+            value={(trace.totalInputTokens + trace.totalOutputTokens).toLocaleString()}
+            icon={ZapIcon}
+          />
+          <StatCard
+            label="Cost"
+            value={formatCost(trace.totalCostUsd)}
+            icon={DollarSignIcon}
+          />
+          <StatCard
+            label="Spans"
+            value={trace.spanCount}
+            icon={HashIcon}
+          />
         </div>
 
         {/* View toggle */}

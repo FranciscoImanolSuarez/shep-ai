@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { MailIcon, CheckIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Hero } from '@/components/shared/Hero'
+import { PageBody } from '@/components/shared/PageHeader'
+import { EmptyState } from '@/components/shared/EmptyState'
 import type { WorkspaceInvitation } from '@/core/domain/entities/workspace'
 
 export default function InvitationsPage() {
@@ -43,29 +46,34 @@ export default function InvitationsPage() {
   }
 
   return (
-    <>
-      <div className="h-14 px-6 border-b border-border flex items-center shrink-0">
-        <span className="text-sm font-semibold tracking-tight">Pending Invitations</span>
-      </div>
+    <div className="flex-1 overflow-auto">
+      <Hero
+        eyebrow="TEAM"
+        title="Invitations"
+        description="Accept or decline pending workspace invitations."
+        variant="default"
+        stats={!loading && invitations.length > 0 ? [{ label: 'Pending', value: invitations.length }] : undefined}
+      />
 
-      <div className="flex-1 overflow-auto px-6 py-6">
+      <PageBody className="space-y-6">
         {loading ? (
           <div className="space-y-2">
             {[1, 2].map((i) => (
-              <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+              <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />
             ))}
           </div>
         ) : invitations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <MailIcon className="size-8 text-muted-foreground" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">No pending invitations.</p>
-          </div>
+          <EmptyState
+            icon={MailIcon}
+            title="No pending invitations"
+            description="You're all caught up. Invitations from workspace admins will appear here."
+          />
         ) : (
           <div className="space-y-2 max-w-xl">
             {invitations.map((inv) => (
               <div
                 key={inv.id}
-                className="flex items-center justify-between px-4 py-4 rounded-lg border border-border"
+                className="flex items-center justify-between px-4 py-4 rounded-xl border border-border hover:border-foreground/20 transition-colors"
               >
                 <div>
                   <p className="text-sm font-medium">Workspace invitation</p>
@@ -98,7 +106,7 @@ export default function InvitationsPage() {
             ))}
           </div>
         )}
-      </div>
-    </>
+      </PageBody>
+    </div>
   )
 }

@@ -10,9 +10,17 @@ import {
   ArrowUpRightIcon,
   ActivityIcon,
   SparklesIcon,
+  MessageSquareTextIcon,
+  BotIcon,
+  GitBranchIcon,
+  BookOpenIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/shared/Badge'
 import { BarChart } from '@/components/shared/Sparkline'
+import { Hero } from '@/components/shared/Hero'
+import { PageBody } from '@/components/shared/PageHeader'
+import { StatCard } from '@/components/shared/StatCard'
+import { SectionDivider } from '@/components/shared/SectionDivider'
 import type { Trace, TraceStatus } from '@/core/domain/entities/trace'
 
 async function getDashboardData(userId: string) {
@@ -151,9 +159,6 @@ export default async function DashboardPage() {
   const data = await getDashboardData(userId)
   const hasActivity = data.totalEvents > 0
   const isNew = data.agentCount === 0 && data.totalConvs === 0
-  const dateLabel = new Date().toLocaleDateString(undefined, {
-    weekday: 'long', month: 'long', day: 'numeric',
-  })
 
   // Activity breakdown (top 4 event types)
   const breakdown = Object.entries(data.activityByType)
@@ -162,143 +167,86 @@ export default async function DashboardPage() {
   const breakdownTotal = breakdown.reduce((a, [, v]) => a + v, 0)
   const BREAKDOWN_COLORS = [
     'bg-primary',
-    'oklch(0.65 0.18 145)', // green
-    'oklch(0.7 0.18 50)',   // orange
-    'oklch(0.55 0.22 290)', // violet
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
   ]
 
+  const ctaActions = (
+    <div className="flex items-center gap-3 flex-wrap">
+      <Link
+        href="/chat"
+        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-foreground text-background text-sm font-medium shadow-sm hover:bg-foreground/90 transition-colors"
+      >
+        <PlusIcon className="size-4" />
+        Start a chat
+      </Link>
+      <Link
+        href="/agents"
+        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors"
+      >
+        Build an agent
+        <ArrowRightIcon className="size-3.5" />
+      </Link>
+    </div>
+  )
+
   return (
-    <div>
-      {/* HERO — Cohere editorial */}
-      <section className="relative overflow-hidden border-b border-border">
-        {/* Decorative gradient blobs */}
-        <div className="absolute -top-32 -right-32 size-96 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 size-80 rounded-full bg-amber-500/10 blur-3xl" />
-        {/* Dot grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.18]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, var(--muted-foreground) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
-        <div className="relative px-6 sm:px-10 pt-16 pb-20 max-w-7xl mx-auto">
-          {/* Date + status row */}
-          <div className="flex items-center gap-3 mb-10 flex-wrap">
-            <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-              {dateLabel}
-            </span>
-            <span className="size-0.5 rounded-full bg-muted-foreground" />
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-              <span className="size-1.5 rounded-full bg-green-500 animate-pulse" />
-              All systems operational
-            </span>
-          </div>
+    <div className="flex-1 overflow-auto">
+      <Hero
+        eyebrow="DASHBOARD"
+        title={`${greeting}, ${firstName}.`}
+        accent={firstName}
+        description="Your AI workspace. Build agents, compose workflows, ship faster. Every primitive you need, none you don't."
+        variant="both"
+        actions={ctaActions}
+        stats={[
+          { label: 'Conversations', value: data.totalConvs.toLocaleString() },
+          { label: 'Agents', value: data.agentCount },
+          { label: 'Workflows', value: data.workflowCount },
+          { label: 'Documents', value: data.docCount.toLocaleString() },
+        ]}
+      />
 
-          {/* Big editorial headline */}
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.02] max-w-5xl">
-            {greeting},{' '}
-            <span className="text-primary">{firstName}</span>.
-          </h1>
-          <p className="mt-6 text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl">
-            Your AI workspace. Build agents, compose workflows, ship faster. Every primitive you need, none you don&apos;t.
-          </p>
+      <PageBody className="space-y-6">
+        {/* Stat cards row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Conversations" value={data.totalConvs.toLocaleString()} icon={MessageSquareTextIcon} />
+          <StatCard label="Agents" value={data.agentCount} icon={BotIcon} />
+          <StatCard label="Workflows" value={data.workflowCount} icon={GitBranchIcon} />
+          <StatCard label="Documents" value={data.docCount.toLocaleString()} icon={BookOpenIcon} />
+        </div>
 
-          {/* CTAs */}
-          <div className="flex items-center gap-3 mt-10 flex-wrap">
-            <Link
-              href="/chat"
-              className="inline-flex items-center gap-1.5 px-5 py-3 rounded-md bg-foreground text-background text-sm font-semibold hover:bg-foreground/90 transition-colors shadow-sm"
-            >
-              <PlusIcon className="size-4" />
-              Start a chat
-            </Link>
+        {/* Onboarding banner — only when new */}
+        {isNew && (
+          <div className="border border-border rounded-xl bg-gradient-to-br from-primary/5 via-background to-background p-6 flex items-start gap-5 flex-wrap hover:border-foreground/20 transition-colors">
+            <div className="size-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <SparklesIcon className="size-6" />
+            </div>
+            <div className="flex-1 min-w-[240px]">
+              <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
+                Welcome
+              </p>
+              <h2 className="text-xl font-semibold tracking-tight">
+                Let&apos;s build your first agent.
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground max-w-xl leading-relaxed">
+                Agents are AI assistants with their own model, tools, and knowledge base. Build one in under a minute and we&apos;ll wire it into chat for you.
+              </p>
+            </div>
             <Link
               href="/agents"
-              className="inline-flex items-center gap-1.5 px-5 py-3 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors shadow-sm"
             >
-              Build an agent
+              Get started
               <ArrowRightIcon className="size-3.5" />
             </Link>
           </div>
+        )}
 
-          {/* Big featured stat — Cohere bento style */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border mt-16 rounded-2xl overflow-hidden border border-border">
-            <div className="bg-background px-6 py-5">
-              <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
-                Conversations
-              </p>
-              <p className="text-4xl font-semibold tabular-nums tracking-tight">
-                {data.totalConvs.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-background px-6 py-5">
-              <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
-                Agents
-              </p>
-              <p className="text-4xl font-semibold tabular-nums tracking-tight">
-                {data.agentCount}
-              </p>
-            </div>
-            <div className="bg-background px-6 py-5">
-              <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
-                Workflows
-              </p>
-              <p className="text-4xl font-semibold tabular-nums tracking-tight">
-                {data.workflowCount}
-              </p>
-            </div>
-            <div className="bg-background px-6 py-5">
-              <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
-                Documents
-              </p>
-              <p className="text-4xl font-semibold tabular-nums tracking-tight">
-                {data.docCount.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+        <SectionDivider label="Workspace" align="left" />
 
-      {/* Onboarding banner — only when new */}
-      {isNew && (
-        <section className="border-b border-border bg-gradient-to-br from-primary/5 via-background to-background">
-          <div className="px-6 sm:px-10 py-10 max-w-7xl mx-auto">
-            <div className="flex items-start gap-5 flex-wrap">
-              <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <SparklesIcon className="size-6" />
-              </div>
-              <div className="flex-1 min-w-[240px]">
-                <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-2">
-                  Welcome
-                </p>
-                <h2 className="text-2xl font-semibold tracking-tight">
-                  Let&apos;s build your first agent.
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground max-w-xl leading-relaxed">
-                  Agents are AI assistants with their own model, tools, and knowledge base. Build one in under a minute and we&apos;ll wire it into chat for you.
-                </p>
-              </div>
-              <Link
-                href="/agents"
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-foreground text-background text-sm font-semibold hover:bg-foreground/90 transition-colors shadow-sm"
-              >
-                Get started
-                <ArrowRightIcon className="size-3.5" />
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* PRINCIPLES — Cohere 3-column editorial */}
-      <section className="px-6 sm:px-10 py-16 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-10">
-          <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-            Workspace
-          </span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
+        {/* Principles — 3-column */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <Principle
             label="Build"
@@ -319,26 +267,24 @@ export default async function DashboardPage() {
             href="/observability"
           />
         </div>
-      </section>
 
-      {/* ACTIVITY — full width band */}
-      {hasActivity && (
-        <section className="border-y border-border bg-muted/30">
-          <div className="px-6 sm:px-10 py-16 max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        {/* Activity section */}
+        {hasActivity && (
+          <>
+            <SectionDivider label="Last 30 days · activity" align="left" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Big chart spans 2 cols */}
               <div className="lg:col-span-2">
-                <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
-                  Last 30 days · activity
-                </p>
-                <h2 className="text-4xl font-semibold tabular-nums tracking-tight">
-                  {data.totalEvents.toLocaleString()}{' '}
-                  <span className="text-base font-normal text-muted-foreground">events</span>
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground max-w-md">
+                <div className="flex items-baseline gap-2 mb-2">
+                  <p className="text-2xl font-semibold tabular-nums tracking-tight">
+                    {data.totalEvents.toLocaleString()}
+                  </p>
+                  <span className="text-sm text-muted-foreground">events</span>
+                </div>
+                <p className="text-sm text-muted-foreground max-w-md mb-6">
                   Daily activity across chat, agent runs, RAG queries, and workflow executions.
                 </p>
-                <div className="mt-8 rounded-2xl border border-border bg-background p-6">
+                <div className="rounded-xl border border-border bg-background p-6 hover:border-foreground/20 transition-colors">
                   <BarChart data={data.activityData} height={120} />
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
                     <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
@@ -351,24 +297,18 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              {/* Breakdown donut/bars sidebar */}
+              {/* Breakdown sidebar */}
               <div>
-                <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
-                  Breakdown · by type
-                </p>
-                <h3 className="text-2xl font-semibold tracking-tight">
+                <p className="text-lg font-semibold tracking-tight mb-6">
                   Where it&apos;s spent
-                </h3>
-                <div className="mt-8 rounded-2xl border border-border bg-background p-6 space-y-4">
+                </p>
+                <div className="rounded-xl border border-border bg-background p-6 space-y-4 hover:border-foreground/20 transition-colors">
                   {breakdown.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       Not enough events to break down yet.
                     </p>
                   ) : breakdown.map(([type, count], i) => {
                     const pct = breakdownTotal > 0 ? (count / breakdownTotal) * 100 : 0
-                    const colorStyle = i === 0
-                      ? undefined
-                      : { background: BREAKDOWN_COLORS[i] }
                     return (
                       <div key={type}>
                         <div className="flex items-center justify-between text-xs mb-1.5">
@@ -381,7 +321,10 @@ export default async function DashboardPage() {
                         <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                           <div
                             className={i === 0 ? 'h-full bg-primary' : 'h-full'}
-                            style={{ width: `${pct}%`, ...colorStyle }}
+                            style={{
+                              width: `${pct}%`,
+                              ...(i > 0 ? { background: BREAKDOWN_COLORS[i] } : {}),
+                            }}
                           />
                         </div>
                       </div>
@@ -397,42 +340,35 @@ export default async function DashboardPage() {
                 </Link>
               </div>
             </div>
-          </div>
-        </section>
-      )}
+          </>
+        )}
 
-      {/* EDITORIAL QUOTE — Cohere signature */}
-      <section className="px-6 sm:px-10 py-16 max-w-4xl mx-auto">
-        <blockquote className="text-center">
-          <p className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
-            &quot;Build agents that{' '}
-            <span className="text-primary">ship</span>.
-            Observe what they do. Iterate fast.&quot;
-          </p>
-          <footer className="mt-6 flex items-center justify-center gap-2 text-[11px] font-mono text-muted-foreground">
-            <span className="uppercase tracking-widest">shep-ai</span>
-            <span className="size-0.5 rounded-full bg-muted-foreground" />
-            <span>Working principles</span>
-          </footer>
-        </blockquote>
-      </section>
-
-      {/* RECENT ACTIVITY — asymmetric bento */}
-      <section className="px-6 sm:px-10 pb-20 max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-10">
-          <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
-            Recent activity
-          </span>
-          <div className="flex-1 h-px bg-border" />
+        {/* Editorial quote */}
+        <div className="py-8">
+          <blockquote className="text-center">
+            <p className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight">
+              &quot;Build agents that{' '}
+              <span className="text-primary">ship</span>.
+              Observe what they do. Iterate fast.&quot;
+            </p>
+            <footer className="mt-5 flex items-center justify-center gap-2 text-[11px] font-mono text-muted-foreground">
+              <span className="uppercase tracking-widest">shep-ai</span>
+              <span className="size-0.5 rounded-full bg-muted-foreground" />
+              <span>Working principles</span>
+            </footer>
+          </blockquote>
         </div>
 
+        <SectionDivider label="Recent activity" align="left" />
+
+        {/* Recent activity bento */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Recent traces — wide */}
-          <div className="lg:col-span-3 rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="lg:col-span-3 rounded-xl border border-border bg-card overflow-hidden hover:border-foreground/20 transition-colors">
             <div className="flex items-center justify-between px-6 py-5 border-b border-border">
               <div>
                 <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">Observability</p>
-                <h2 className="text-lg font-semibold tracking-tight mt-1">Recent traces</h2>
+                <h2 className="text-base font-semibold tracking-tight mt-1">Recent traces</h2>
               </div>
               <Link
                 href="/observability"
@@ -473,11 +409,11 @@ export default async function DashboardPage() {
           </div>
 
           {/* Recent conversations — narrow */}
-          <div className="lg:col-span-2 rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="lg:col-span-2 rounded-xl border border-border bg-card overflow-hidden hover:border-foreground/20 transition-colors">
             <div className="flex items-center justify-between px-6 py-5 border-b border-border">
               <div>
                 <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">Chat</p>
-                <h2 className="text-lg font-semibold tracking-tight mt-1">Conversations</h2>
+                <h2 className="text-base font-semibold tracking-tight mt-1">Conversations</h2>
               </div>
               <Link
                 href="/chat"
@@ -518,77 +454,58 @@ export default async function DashboardPage() {
             )}
           </div>
         </div>
-      </section>
 
-      {/* CLOSING BAND */}
-      <section className="relative overflow-hidden border-t border-border bg-gradient-to-br from-primary/5 via-background to-background">
-        <div
-          className="absolute inset-0 opacity-[0.12]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, var(--muted-foreground) 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-        <div className="relative px-6 sm:px-10 py-16 max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Link
-              href="/marketplace"
-              className="group block"
-            >
-              <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
-                Explore
-              </p>
-              <h3 className="text-2xl font-semibold tracking-tight group-hover:text-primary transition-colors">
-                Browse marketplace
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                Install agents built and shared by the community. Save time, learn patterns.
-              </p>
-              <span className="inline-flex items-center gap-1 mt-4 text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                Discover
-                <ArrowUpRightIcon className="size-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </span>
-            </Link>
-            <Link
-              href="/knowledge-bases"
-              className="group block"
-            >
-              <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
-                Connect
-              </p>
-              <h3 className="text-2xl font-semibold tracking-tight group-hover:text-primary transition-colors">
-                Add knowledge
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                Upload documents to a knowledge base so your agents can answer from your sources.
-              </p>
-              <span className="inline-flex items-center gap-1 mt-4 text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                {data.kbsCount > 0 ? `${data.kbsCount} knowledge base${data.kbsCount !== 1 ? 's' : ''}` : 'Create one'}
-                <ArrowUpRightIcon className="size-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </span>
-            </Link>
-            <Link
-              href="/design"
-              className="group block"
-            >
-              <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
-                Design
-              </p>
-              <h3 className="text-2xl font-semibold tracking-tight group-hover:text-primary transition-colors">
-                Design system
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                Every primitive, token and pattern. Built on OKLCH, Tailwind v4, and React 19.
-              </p>
-              <span className="inline-flex items-center gap-1 mt-4 text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                Open
-                <ArrowUpRightIcon className="size-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </span>
-            </Link>
-          </div>
+        <SectionDivider label="Discover" align="left" />
+
+        {/* Closing links */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-6">
+          <Link href="/marketplace" className="group block">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
+              Explore
+            </p>
+            <h3 className="text-xl font-semibold tracking-tight group-hover:text-primary transition-colors">
+              Browse marketplace
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Install agents built and shared by the community. Save time, learn patterns.
+            </p>
+            <span className="inline-flex items-center gap-1 mt-4 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+              Discover
+              <ArrowUpRightIcon className="size-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </span>
+          </Link>
+          <Link href="/knowledge-bases" className="group block">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
+              Connect
+            </p>
+            <h3 className="text-xl font-semibold tracking-tight group-hover:text-primary transition-colors">
+              Add knowledge
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Upload documents to a knowledge base so your agents can answer from your sources.
+            </p>
+            <span className="inline-flex items-center gap-1 mt-4 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+              {data.kbsCount > 0 ? `${data.kbsCount} knowledge base${data.kbsCount !== 1 ? 's' : ''}` : 'Create one'}
+              <ArrowUpRightIcon className="size-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </span>
+          </Link>
+          <Link href="/design" className="group block">
+            <p className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase mb-3">
+              Design
+            </p>
+            <h3 className="text-xl font-semibold tracking-tight group-hover:text-primary transition-colors">
+              Design system
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Every primitive, token and pattern. Built on OKLCH, Tailwind v4, and React 19.
+            </p>
+            <span className="inline-flex items-center gap-1 mt-4 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+              Open
+              <ArrowUpRightIcon className="size-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </span>
+          </Link>
         </div>
-      </section>
-
+      </PageBody>
     </div>
   )
 }

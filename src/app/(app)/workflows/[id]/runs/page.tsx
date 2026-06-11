@@ -3,21 +3,24 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeftIcon, NetworkIcon, ExternalLinkIcon } from 'lucide-react'
+import { NetworkIcon, ExternalLinkIcon, ArrowLeftIcon } from 'lucide-react'
 import type { WorkflowRun, WorkflowRunStatus } from '@/core/domain/entities/workflow-run'
 import { Alert } from '@/components/shared/Alert'
+import { Hero } from '@/components/shared/Hero'
+import { PageBody } from '@/components/shared/PageHeader'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { Badge } from '@/components/shared/Badge'
+import { DataTable } from '@/components/shared/DataTable'
+import { Button } from '@/components/ui/button'
+
+const STATUS_VARIANT: Record<WorkflowRunStatus, 'warning' | 'success' | 'danger'> = {
+  running: 'warning',
+  completed: 'success',
+  failed: 'danger',
+}
 
 function StatusBadge({ status }: { status: WorkflowRunStatus }) {
-  const map: Record<WorkflowRunStatus, string> = {
-    running: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    completed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  }
-  return (
-    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${map[status]}`}>
-      {status}
-    </span>
-  )
+  return <Badge variant={STATUS_VARIANT[status]}>{status}</Badge>
 }
 
 function formatDuration(ms?: number | null): string {
@@ -94,124 +97,87 @@ export default function WorkflowRunsPage() {
     return () => clearInterval(interval)
   }, [id, runs])
 
+  const backAction = (
+    <Button variant="ghost" size="sm" render={<Link href={`/workflows/${id}/edit`} />}>
+      <ArrowLeftIcon className="size-3.5" />
+      Back to editor
+    </Button>
+  )
+
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-auto">
-      {/* Header */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Link
-            href="/workflows"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeftIcon className="size-3.5" />
-            Workflows
-          </Link>
-          {workflowName && (
-            <>
-              <span className="text-muted-foreground/40 text-xs">/</span>
-              <Link
-                href={`/workflows/${id}/edit`}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {workflowName}
-              </Link>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          <NetworkIcon className="size-5 text-muted-foreground" />
-          <div>
-            <h1 className="text-lg font-semibold">Runs</h1>
-            <p className="text-sm text-muted-foreground">
-              Execution history for this workflow — click a trace to debug
-            </p>
-          </div>
-          <div className="ml-auto">
-            <Link
-              href={`/workflows/${id}/edit`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent transition-colors"
+    <div className="flex-1 overflow-auto">
+      <Hero
+        eyebrow="BUILD"
+        title={workflowName ? `${workflowName} runs` : 'Runs'}
+        description="Execution history for this workflow — click a trace to debug"
+        variant="default"
+        actions={backAction}
+        stats={runs.length > 0 ? [{ label: 'Total runs', value: runs.length }] : undefined}
+      />
+
+      <PageBody className="space-y-6">
+        {/* Error banner */}
+        {error && <Alert variant="danger" description={error} />}
+
+        <DataTable
+          headers={['Status', 'Started', 'Duration', 'Error', 'Trace']}
+          loading={loading}
+          loadingRows={4}
+          empty={
+            runs.length === 0 && !loading ? (
+              <EmptyState
+                icon={NetworkIcon}
+                title="No runs yet"
+                description="Open the editor to trigger your first workflow run."
+                action={
+                  <Button size="sm" render={<Link href={`/workflows/${id}/edit`} />}>
+                    Open editor
+                  </Button>
+                }
+              />
+            ) : undefined
+          }
+        >
+          {runs.map((run) => (
+            <tr
+              key={run.id}
+              className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
             >
-              Edit workflow
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Error banner */}
-      {error && (
-        <Alert variant="danger" description={error} />
-      )}
-
-      {/* Content */}
-      {loading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-12 bg-muted animate-pulse rounded-lg" />
+              <td className="px-4 py-3">
+                <StatusBadge status={run.status} />
+              </td>
+              <td className="px-4 py-3 text-muted-foreground text-xs hidden sm:table-cell">
+                {formatDate(run.startedAt)}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground text-xs hidden md:table-cell">
+                {formatDuration(run.durationMs)}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground text-xs max-w-[200px] truncate hidden lg:table-cell">
+                {run.errorMessage ?? '—'}
+              </td>
+              <td className="px-4 py-3 text-right">
+                {run.traceId ? (
+                  <Link
+                    href={`/observability/${run.traceId}`}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    title="View trace in Observability"
+                  >
+                    <ExternalLinkIcon className="size-3" />
+                    Trace
+                  </Link>
+                ) : (
+                  <span
+                    className="text-xs text-muted-foreground cursor-not-allowed"
+                    title="Trace unavailable"
+                  >
+                    No trace
+                  </span>
+                )}
+              </td>
+            </tr>
           ))}
-        </div>
-      ) : runs.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-          <NetworkIcon className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">No runs yet</p>
-          <Link
-            href={`/workflows/${id}/edit`}
-            className="text-sm text-primary hover:underline"
-          >
-            Open the editor to run this workflow →
-          </Link>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Status</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground hidden sm:table-cell">Started</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground hidden md:table-cell">Duration</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground hidden lg:table-cell">Error</th>
-                <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground text-right">Trace</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.map((run) => (
-                <tr key={run.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <StatusBadge status={run.status} />
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs hidden sm:table-cell">
-                    {formatDate(run.startedAt)}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs hidden md:table-cell">
-                    {formatDuration(run.durationMs)}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs max-w-[200px] truncate hidden lg:table-cell">
-                    {run.errorMessage ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {run.traceId ? (
-                      <Link
-                        href={`/observability/${run.traceId}`}
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                        title="View trace in Observability"
-                      >
-                        <ExternalLinkIcon className="size-3" />
-                        Trace
-                      </Link>
-                    ) : (
-                      <span
-                        className="text-xs text-muted-foreground cursor-not-allowed"
-                        title="Trace unavailable"
-                      >
-                        No trace
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        </DataTable>
+      </PageBody>
     </div>
   )
 }
