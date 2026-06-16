@@ -1,15 +1,13 @@
 import { streamText, generateText, tool, stepCountIs, Output } from 'ai'
 import type { LanguageModel, ToolSet, ModelMessage, StopCondition, PrepareStepFunction } from 'ai'
-import type { z } from 'zod'
 import { getObservedModel } from '@/adapters/ai/model-factory'
 import { anthropic } from '@ai-sdk/anthropic'
 import { openai } from '@ai-sdk/openai'
 import type { Agent, AgentProvider } from '@/core/domain/entities/agent'
 import type { AgentToolDefinition } from '@/core/domain/entities/agent-tool'
 import type { AgentStep, AgentToolCall } from '@/core/domain/entities/agent-execution'
-import type { Message } from '@/core/domain/entities/message'
 import type { TracerPort, TraceContext } from '@/core/ports/out/tracer.port'
-import type { AgentRunnerPort } from '@/core/ports/out/agent-runner.port'
+import type { AgentRunnerPort, AgentRunnerInput, AgentRunResult, AgentRuntimeContext } from '@/core/ports/out/agent-runner.port'
 import { computeCost } from '@/core/domain/entities/audit-event'
 
 /**
@@ -54,52 +52,9 @@ function getCacheTokens(usage: unknown): { cacheReadTokens: number; cacheCreatio
   }
 }
 
-export interface AgentRunnerInput {
-  agent: Agent
-  messages: Message[]
-  tools: AgentToolDefinition[]
-  context?: Record<string, unknown>
-  /**
-   * P0.2 — Optional Zod schema. When set, the model is forced to produce a JSON
-   * object matching the schema and `AgentRunResult.object` is populated.
-   * Honored by `runToCompletion` only; ignored by `run` (streaming).
-   */
-  outputSchema?: z.ZodType<unknown>
-  /**
-   * P1.3 — Optional `prepareStep` hook for the caller. Runs BEFORE the built-in
-   * cache_control marker, so a caller can trim context / swap models / gate
-   * tools per step without losing prompt caching. Anything returned overrides
-   * the corresponding setting for that step.
-   */
-  prepareStepExtension?: PrepareStepFunction<ToolSet>
-}
-
-export interface AgentRunResult {
-  text: string
-  /** P0.2 — populated when `AgentRunnerInput.outputSchema` was provided. */
-  object?: unknown
-  steps: Array<{
-    stepNumber: number
-    text: string
-    toolCalls: AgentToolCall[]
-    tokensUsed: number
-    finishReason: string
-  }>
-  totalTokens: number
-  inputTokens: number
-  outputTokens: number
-}
-
 export interface AgentStreamEvent {
   type: 'text-delta' | 'step-complete' | 'tool-call' | 'finish' | 'error'
   data: unknown
-}
-
-/** Optional runtime tracing context passed alongside AgentRunnerInput */
-export interface AgentRuntimeContext {
-  traceId: string
-  parentSpanId: string
-  workspaceId: string
 }
 
 function getModel(modelId: string, provider: Agent['provider']): LanguageModel {
@@ -271,20 +226,15 @@ export class AgentRunnerAdapter implements AgentRunnerPort {
     input: AgentRunnerInput,
     runtimeContext?: AgentRuntimeContext,
   ): Promise<AgentRunResult> {
-    const { agent, messages, tools: toolDefs, outputSchema, prepareStepExtension } = input
+    const { agent, messages, tools: toolDefs, outputSchema } = input
     const model = getModel(agent.model, agent.provider)
     const sdkTools = convertTools(toolDefs, agent.provider)
 
     // P1.3 + P0.1: compose caller extension (runs first, can trim / swap / gate)
     // with the built-in cache_control marker (runs last on the resulting messages).
-    const composedPrepareStep: PrepareStepFunction<ToolSet> = async (opts) => {
-      const fromExtension = prepareStepExtension ? await prepareStepExtension(opts) : undefined
-      const effectiveMessages = fromExtension?.messages ?? opts.messages
-      return {
-        ...(fromExtension ?? {}),
-        messages: addCacheControl(effectiveMessages, agent.provider),
-      }
-    }
+    const composedPrepareStep: PrepareStepFunction<ToolSet> = async (opts) => ({
+      messages: addCacheControl(opts.messages, agent.provider),
+    })
 
     const sdkMessages = messages.map((m) => ({
       role: m.role as 'user' | 'assistant' | 'system',
@@ -373,20 +323,15 @@ export class AgentRunnerAdapter implements AgentRunnerPort {
   }
 
   run(input: AgentRunnerInput, runtimeContext?: AgentRuntimeContext): ReadableStream<string> {
-    const { agent, messages, tools: toolDefs, prepareStepExtension } = input
+    const { agent, messages, tools: toolDefs } = input
     const model = getModel(agent.model, agent.provider)
     const sdkTools = convertTools(toolDefs, agent.provider)
     const steps: AgentStep[] = []
 
     // P1.3 + P0.1: composed prepareStep (caller extension first, cache last)
-    const composedPrepareStep: PrepareStepFunction<ToolSet> = async (opts) => {
-      const fromExtension = prepareStepExtension ? await prepareStepExtension(opts) : undefined
-      const effectiveMessages = fromExtension?.messages ?? opts.messages
-      return {
-        ...(fromExtension ?? {}),
-        messages: addCacheControl(effectiveMessages, agent.provider),
-      }
-    }
+    const composedPrepareStep: PrepareStepFunction<ToolSet> = async (opts) => ({
+      messages: addCacheControl(opts.messages, agent.provider),
+    })
 
     const sdkMessages = messages.map((m) => ({
       role: m.role as 'user' | 'assistant' | 'system',
