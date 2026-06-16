@@ -1,14 +1,9 @@
 import { redirect } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { auth } from '@/lib/auth'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { getEnv } from '@/config/env'
 import { Toaster } from '@/components/shared/Toast'
-
-const CommandPalette = dynamic(
-  () => import('@/components/shared/CommandPalette').then((m) => m.CommandPalette),
-  { ssr: false },
-)
+import { CommandPaletteLazy } from '@/components/shared/CommandPaletteLazy'
 
 export default async function AppLayout({
   children,
@@ -32,7 +27,7 @@ export default async function AppLayout({
         {children}
       </main>
       <Toaster />
-      <CommandPalette />
+      <CommandPaletteLazy />
     </div>
   )
 }
