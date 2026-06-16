@@ -52,8 +52,6 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Badge } from '@/components/shared/Badge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Spinner } from '@/components/shared/Spinner'
-import { AgentAvatar } from '@/components/ai/AgentAvatar'
-import { ModelBadge } from '@/components/ai/ModelBadge'
 import { toast } from '@/components/shared/Toast'
 
 interface AgentData {
@@ -161,6 +159,41 @@ function ToolPill({ label, Icon }: { label: string; Icon: LucideIcon }) {
       <Icon className="size-2.5 shrink-0" strokeWidth={2} />
       <span className="truncate max-w-[120px]">{label}</span>
     </span>
+  )
+}
+
+const PROVIDER_DOT: Record<AgentData['provider'], string> = {
+  openai: 'bg-emerald-500',
+  anthropic: 'bg-orange-500',
+  ollama: 'bg-violet-500',
+}
+
+// Distinct, deterministic avatar per agent — initials on a colour seeded by id,
+// so every card is instantly recognisable instead of an identical bot icon.
+const AVATAR_COLORS = [
+  'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500',
+  'bg-cyan-600', 'bg-indigo-500', 'bg-orange-500', 'bg-teal-500', 'bg-fuchsia-500',
+]
+
+function hashString(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
+function agentInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function InitialsAvatar({ name, seed }: { name: string; seed: string }) {
+  const color = AVATAR_COLORS[hashString(seed) % AVATAR_COLORS.length]
+  return (
+    <div className={`size-10 rounded-lg shrink-0 flex items-center justify-center text-white text-[13px] font-semibold tracking-tight ${color}`}>
+      {agentInitials(name)}
+    </div>
   )
 }
 
@@ -283,20 +316,21 @@ function AgentCard({
   }
 
   return (
-    <div className="border border-border rounded-xl hover:border-foreground/20 hover:shadow-sm transition-all flex flex-col">
+    <div className="border border-border bg-card rounded-xl hover:border-foreground/30 hover:shadow-md transition-all flex flex-col">
       {/* Card header */}
       <div className="p-4 flex-1">
         <div className="flex items-start gap-3 mb-3">
-          <AgentAvatar name={agent.name} provider={agent.provider} size="md" />
+          <InitialsAvatar name={agent.name} seed={agent.id} />
           <div className="flex-1 min-w-0">
             <Link
               href={`/agents/${agent.id}`}
-              className="text-sm font-semibold truncate hover:text-primary transition-colors block"
+              className="text-sm font-semibold leading-tight truncate hover:text-primary transition-colors block"
             >
               {agent.name}
             </Link>
-            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              <ModelBadge provider={agent.provider} model={agent.model} />
+            <div className="flex items-center gap-1.5 mt-1 min-w-0 text-xs text-muted-foreground">
+              <span className={`size-1.5 rounded-full shrink-0 ${PROVIDER_DOT[agent.provider]}`} />
+              <span className="truncate font-mono text-[11px]">{agent.model}</span>
             </div>
           </div>
           <DropdownMenu>
@@ -334,9 +368,9 @@ function AgentCard({
           </DropdownMenu>
         </div>
 
-        {agent.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{agent.description}</p>
-        )}
+        <p className={`text-xs line-clamp-2 mb-3 leading-relaxed ${agent.description ? 'text-muted-foreground' : 'text-muted-foreground/40 italic'}`}>
+          {agent.description || 'No description'}
+        </p>
 
         {/* Tool pills */}
         {agent.toolIds.length > 0 && (() => {
@@ -358,16 +392,16 @@ function AgentCard({
       </div>
 
       {/* Footer */}
-      <div className="border-t border-border px-4 py-2.5 flex items-center gap-2">
+      <div className="border-t border-border px-4 py-2.5">
         <button
           onClick={() => {
             setExpanded((v) => !v)
             if (!expanded) { setRunOutput(''); setChildExecutions([]); setRunMeta(null) }
           }}
-          className="inline-flex items-center gap-1.5 flex-1 px-3 py-1.5 rounded-md bg-foreground text-background text-xs font-medium hover:bg-foreground/90 transition-colors"
+          className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-muted hover:border-foreground/20 transition-colors"
         >
           <PlayIcon className="size-3" />
-          Run
+          {expanded ? 'Close' : 'Quick run'}
           {expanded ? <ChevronUpIcon className="size-3 ml-auto" /> : <ChevronDownIcon className="size-3 ml-auto" />}
         </button>
       </div>
