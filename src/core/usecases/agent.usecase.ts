@@ -115,6 +115,7 @@ export class AgentUseCase implements AgentPort {
     const agent: Agent = {
       id: randomUUID(),
       knowledgeBaseId: input.knowledgeBaseId ?? null,
+      workspaceId: input.workspaceId ?? null,
       name: input.name,
       description: input.description,
       systemPrompt: input.systemPrompt,
@@ -151,7 +152,8 @@ export class AgentUseCase implements AgentPort {
     return this.agentStore.delete(id)
   }
 
-  async listAgents(): Promise<Agent[]> {
+  async listAgents(workspaceId?: string): Promise<Agent[]> {
+    if (workspaceId) return this.agentStore.findByWorkspace(workspaceId)
     return this.agentStore.findAll()
   }
 

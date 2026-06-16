@@ -25,6 +25,7 @@ export interface AgentConfig {
 export interface Agent {
   id: string
   knowledgeBaseId?: string | null
+  workspaceId?: string | null
   name: string
   description: string
   systemPrompt: string

@@ -9,6 +9,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   ClockIcon,
+  CopyIcon,
   CpuIcon,
   ExternalLinkIcon,
   SaveIcon,
@@ -23,14 +24,15 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { DataTable } from '@/components/shared/DataTable'
 import { Badge } from '@/components/shared/Badge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { Spinner } from '@/components/shared/Spinner'
 import { toast } from '@/components/shared/Toast'
 import { AgentAvatar } from '@/components/ai/AgentAvatar'
 import { ModelBadge } from '@/components/ai/ModelBadge'
-import { KnowledgeBaseSelector } from '@/components/knowledge-bases/KnowledgeBaseSelector'
 import {
   AgentConfigFields,
   type AgentConfigValues,
 } from '@/components/agents/AgentConfigFields'
+import { AgentBasicFields, type AgentBasicValues } from '@/components/agents/AgentBasicFields'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,6 +83,11 @@ interface EvalsData {
   recentFailures: { executionId: string; steps: number; createdAt: string }[]
 }
 
+interface AgentUsage {
+  workflows: { id: string; name: string }[]
+  schedules: { id: string; cronExpression: string }[]
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function relativeTime(iso: string): string {
@@ -113,6 +120,18 @@ function configToValues(config: AgentConfig): AgentConfigValues {
   }
 }
 
+function agentToBasic(a: AgentData): AgentBasicValues {
+  return {
+    name: a.name,
+    description: a.description,
+    systemPrompt: a.systemPrompt,
+    provider: a.provider,
+    model: a.model,
+    toolIds: a.toolIds,
+    knowledgeBaseId: a.knowledgeBaseId ?? null,
+  }
+}
+
 function ExecStatusBadge({ status }: { status: AgentExecution['status'] }) {
   const map: Record<AgentExecution['status'], 'warning' | 'success' | 'danger'> = {
     running: 'warning',
@@ -132,14 +151,16 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
-  // Form state
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [systemPrompt, setSystemPrompt] = useState('')
-  const [model, setModel] = useState('')
-  const [provider, setProvider] = useState<Provider>('openai')
-  const [selectedSubAgents, setSelectedSubAgents] = useState<string[]>([])
-  const [selectedKb, setSelectedKb] = useState<string | null>(null)
+  // Controlled form state via AgentBasicValues
+  const [basic, setBasic] = useState<AgentBasicValues>({
+    name: '',
+    description: '',
+    systemPrompt: '',
+    provider: 'openai',
+    model: '',
+    toolIds: [],
+    knowledgeBaseId: null,
+  })
   const [advConfig, setAdvConfig] = useState<AgentConfigValues>({
     maxSteps: 10,
     temperature: 0.7,
@@ -150,9 +171,6 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   })
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-
-  // Other agents (for sub-agent checkboxes)
-  const [allAgents, setAllAgents] = useState<AgentData[]>([])
 
   // Evals
   const [evals, setEvals] = useState<EvalsData | null>(null)
@@ -165,6 +183,8 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [usageInfo, setUsageInfo] = useState<AgentUsage | null>(null)
+  const [usageLoading, setUsageLoading] = useState(false)
 
   // ── Load agent ──────────────────────────────────────────────────────────────
   const loadAgent = useCallback(() => {
@@ -175,16 +195,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
         const data = await r.json() as { agent: AgentData }
         const a = data.agent
         setAgent(a)
-        setName(a.name)
-        setDescription(a.description)
-        setSystemPrompt(a.systemPrompt)
-        setModel(a.model)
-        setProvider(a.provider)
-        const subIds = a.toolIds
-          .filter((t) => t.startsWith('agent:'))
-          .map((t) => t.slice('agent:'.length))
-        setSelectedSubAgents(subIds)
-        setSelectedKb(a.knowledgeBaseId ?? null)
+        setBasic(agentToBasic(a))
         setAdvConfig(configToValues(a.config))
       })
       .catch(() => setNotFound(true))
@@ -193,13 +204,6 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
 
   // ── Side effects ────────────────────────────────────────────────────────────
   useEffect(() => { loadAgent() }, [loadAgent])
-
-  useEffect(() => {
-    fetch('/api/agents')
-      .then((r) => r.json())
-      .then((d) => setAllAgents((d.agents ?? []).filter((a: AgentData) => a.id !== id)))
-      .catch(() => {})
-  }, [id])
 
   useEffect(() => {
     setEvalsLoading(true)
@@ -220,12 +224,6 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   }, [id])
 
   // ── Handlers ────────────────────────────────────────────────────────────────
-  function toggleSubAgent(sid: string) {
-    setSelectedSubAgents((prev) =>
-      prev.includes(sid) ? prev.filter((a) => a !== sid) : [...prev, sid],
-    )
-  }
-
   async function handleSave() {
     setSaving(true)
     try {
@@ -233,13 +231,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          description,
-          systemPrompt,
-          model,
-          provider,
-          toolIds: selectedSubAgents.map((sid) => `agent:${sid}`),
-          knowledgeBaseId: selectedKb,
+          name: basic.name,
+          description: basic.description,
+          systemPrompt: basic.systemPrompt,
+          model: basic.model,
+          provider: basic.provider,
+          toolIds: basic.toolIds,
+          knowledgeBaseId: basic.knowledgeBaseId,
           config: {
             maxSteps: advConfig.maxSteps,
             temperature: advConfig.temperature,
@@ -253,6 +251,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
       if (res.ok) {
         const data = await res.json() as { agent: AgentData }
         setAgent(data.agent)
+        setBasic(agentToBasic(data.agent))
         toast.success('Agent saved')
       } else {
         const err = await res.json() as { error?: string }
@@ -263,16 +262,95 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  async function initiateDelete() {
+    setUsageInfo(null)
+    setUsageLoading(true)
+    setConfirmDelete(true)
+    try {
+      const res = await fetch(`/api/agents/${id}/usage`)
+      if (res.ok) setUsageInfo(await res.json())
+    } catch { /* ignore */ } finally {
+      setUsageLoading(false)
+    }
+  }
+
   async function handleDelete() {
     setDeleting(true)
     try {
-      await fetch(`/api/agents/${id}`, { method: 'DELETE' })
-      toast.success('Agent deleted')
-      router.push('/agents')
+      const res = await fetch(`/api/agents/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast.success('Agent deleted')
+        router.push('/agents')
+      } else {
+        toast.error('Failed to delete agent')
+        setConfirmDelete(false)
+      }
     } finally {
       setDeleting(false)
-      setConfirmDelete(false)
     }
+  }
+
+  async function handleClone() {
+    if (!agent) return
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${agent.name} (copy)`,
+          description: agent.description,
+          systemPrompt: agent.systemPrompt,
+          model: agent.model,
+          provider: agent.provider,
+          toolIds: agent.toolIds,
+          knowledgeBaseId: agent.knowledgeBaseId ?? null,
+          config: agent.config,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json() as { agent: AgentData }
+        toast.success(`Duplicated as "${data.agent.name}"`)
+        router.push(`/agents/${data.agent.id}`)
+      } else {
+        toast.error('Failed to duplicate agent')
+      }
+    } catch {
+      toast.error('Failed to duplicate agent')
+    }
+  }
+
+  // ── Delete description ──────────────────────────────────────────────────────
+  function deleteDescription() {
+    if (usageLoading) return 'Checking usage…'
+    if (!usageInfo) return 'This action cannot be undone.'
+    const { workflows, schedules } = usageInfo
+    if (workflows.length === 0 && schedules.length === 0) {
+      return 'This action cannot be undone. All executions and configuration will be permanently removed.'
+    }
+    return (
+      <div className="space-y-2">
+        <p className="text-amber-600 dark:text-amber-400 font-medium">
+          Warning: this agent is in use.
+        </p>
+        {workflows.length > 0 && (
+          <div className="text-xs">
+            <p className="font-medium mb-0.5">Used by {workflows.length} workflow{workflows.length !== 1 ? 's' : ''}:</p>
+            <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+              {workflows.map((w) => <li key={w.id}>{w.name}</li>)}
+            </ul>
+          </div>
+        )}
+        {schedules.length > 0 && (
+          <div className="text-xs">
+            <p className="font-medium mb-0.5">Used by {schedules.length} schedule{schedules.length !== 1 ? 's' : ''}:</p>
+            <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+              {schedules.map((s) => <li key={s.id}>{s.cronExpression}</li>)}
+            </ul>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">Deleting may break them. This action cannot be undone.</p>
+      </div>
+    )
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -290,8 +368,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   if (notFound || !agent) {
     return (
       <div className="flex-1 overflow-auto px-6 py-6">
-        <EmptyState icon={BotIcon} title="Agent not found" description="This agent doesn't exist or was deleted.">
-        </EmptyState>
+        <EmptyState icon={BotIcon} title="Agent not found" description="This agent doesn't exist or was deleted." />
         <div className="mt-4 flex justify-center">
           <Link href="/agents" className="text-sm text-primary underline underline-offset-2">
             Back to agents
@@ -322,15 +399,22 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
               Back
             </Link>
             <button
+              onClick={handleClone}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm hover:bg-accent transition-colors text-muted-foreground"
+            >
+              <CopyIcon className="size-3.5" />
+              Duplicate
+            </button>
+            <button
               onClick={handleSave}
               disabled={saving}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-40"
             >
-              <SaveIcon className="size-3.5" />
+              {saving ? <Spinner size="sm" /> : <SaveIcon className="size-3.5" />}
               {saving ? 'Saving…' : 'Save'}
             </button>
             <button
-              onClick={() => setConfirmDelete(true)}
+              onClick={initiateDelete}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-destructive hover:bg-destructive/10 text-sm transition-colors"
             >
               <TrashIcon className="size-3.5" />
@@ -361,93 +445,12 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
 
-            {/* Basic fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Description</label>
-                <input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What does this agent do?"
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">System Prompt</label>
-              <textarea
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                rows={4}
-                placeholder="You are a helpful assistant…"
-                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm resize-none"
-              />
-            </div>
-
-            <div className="flex gap-3 flex-wrap">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Provider</label>
-                <select
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value as Provider)}
-                  className="px-3 py-2 rounded-md border border-input bg-background text-sm"
-                >
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="ollama">Ollama</option>
-                </select>
-              </div>
-              <div className="flex-1 min-w-40 space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Model</label>
-                <input
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="e.g. gpt-4o-mini"
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Knowledge Base */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Knowledge Base</label>
-              <KnowledgeBaseSelector value={selectedKb} onChange={setSelectedKb} placeholder="None" />
-            </div>
-
-            {/* Sub-Agents */}
-            {allAgents.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">Sub-Agents</p>
-                <div className="rounded-md border border-input bg-background p-2 space-y-1 max-h-40 overflow-auto">
-                  {allAgents.map((a) => (
-                    <label key={a.id} className="flex items-center gap-2 cursor-pointer hover:text-foreground text-sm py-0.5">
-                      <input
-                        type="checkbox"
-                        checked={selectedSubAgents.includes(a.id)}
-                        onChange={() => toggleSubAgent(a.id)}
-                        className="rounded"
-                      />
-                      <span className="truncate">{a.name}</span>
-                      <span className="text-xs text-muted-foreground ml-auto shrink-0">{a.provider}/{a.model}</span>
-                    </label>
-                  ))}
-                </div>
-                {selectedSubAgents.length > 0 && (
-                  <p className="text-[11px] text-muted-foreground">
-                    {selectedSubAgents.length} sub-agent{selectedSubAgents.length !== 1 ? 's' : ''} selected
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Basic fields (shared component — includes ToolPicker) */}
+            <AgentBasicFields
+              values={basic}
+              onChange={setBasic}
+              currentAgentId={id}
+            />
 
             {/* Advanced collapsible */}
             <div className="border border-border rounded-lg overflow-hidden">
@@ -476,7 +479,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
                 disabled={saving}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
               >
-                <SaveIcon className="size-3.5" />
+                {saving ? <Spinner size="sm" /> : <SaveIcon className="size-3.5" />}
                 {saving ? 'Saving…' : 'Save changes'}
               </button>
             </div>
@@ -613,7 +616,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title={`Delete "${agent.name}"?`}
-        description="This action cannot be undone. All executions and configuration will be permanently removed."
+        description={deleteDescription()}
         confirmLabel="Delete agent"
         variant="destructive"
         onConfirm={handleDelete}

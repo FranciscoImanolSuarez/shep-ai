@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, or, isNull } from 'drizzle-orm'
 import type { AgentStorePort } from '@/core/ports/out/agent-store.port'
 import type { Agent } from '@/core/domain/entities/agent'
 import { agents } from './schema'
@@ -11,6 +11,7 @@ export class AgentStoreAdapter implements AgentStorePort {
     const [row] = await this.db.insert(agents).values({
       id: agent.id,
       knowledgeBaseId: agent.knowledgeBaseId ?? null,
+      workspaceId: agent.workspaceId ?? null,
       name: agent.name,
       description: agent.description,
       systemPrompt: agent.systemPrompt,
@@ -43,6 +44,14 @@ export class AgentStoreAdapter implements AgentStorePort {
     return rows.map((r) => this.toDomain(r))
   }
 
+  async findByWorkspace(workspaceId: string): Promise<Agent[]> {
+    const rows = await this.db
+      .select()
+      .from(agents)
+      .where(or(eq(agents.workspaceId, workspaceId), isNull(agents.workspaceId)))
+    return rows.map((r) => this.toDomain(r))
+  }
+
   async update(id: string, data: Partial<Omit<Agent, 'id' | 'createdAt'>>): Promise<Agent> {
     const [row] = await this.db
       .update(agents)
@@ -63,6 +72,7 @@ export class AgentStoreAdapter implements AgentStorePort {
     return {
       id: row.id,
       knowledgeBaseId: row.knowledgeBaseId ?? null,
+      workspaceId: row.workspaceId ?? null,
       name: row.name,
       description: row.description,
       systemPrompt: row.systemPrompt,

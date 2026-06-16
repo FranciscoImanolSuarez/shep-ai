@@ -13,6 +13,7 @@ export interface CreateAgentInput {
   config?: Partial<Agent['config']>
   metadata?: Record<string, unknown>
   knowledgeBaseId?: string | null
+  workspaceId?: string | null
 }
 
 export interface UpdateAgentInput {
@@ -56,7 +57,7 @@ export interface AgentPort {
   createAgent(input: CreateAgentInput): Promise<Agent>
   updateAgent(id: string, input: UpdateAgentInput): Promise<Agent>
   deleteAgent(id: string): Promise<void>
-  listAgents(): Promise<Agent[]>
+  listAgents(workspaceId?: string): Promise<Agent[]>
   getAgent(id: string): Promise<Agent | null>
 
   // Execution

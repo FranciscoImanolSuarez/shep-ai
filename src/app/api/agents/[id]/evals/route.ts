@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
 import { computeCost } from '@/core/domain/entities/audit-event'
 
@@ -19,6 +20,11 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const session = await auth()
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { id } = await params
   const { agentUseCase, executionStore } = getContainer()
 

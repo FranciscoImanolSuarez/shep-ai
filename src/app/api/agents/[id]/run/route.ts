@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
 import type { Message } from '@/core/domain/entities/message'
 
@@ -6,6 +7,11 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const session = await auth()
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { id } = await params
   const body = await req.json()
   const { messages, context } = body as {
