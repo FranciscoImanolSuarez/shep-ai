@@ -37,11 +37,15 @@ import { WorkflowUseCase } from '@/core/usecases/workflow.usecase'
 // P0.3: MCP
 import { McpServerStoreAdapter } from '@/adapters/db/mcp-server-store.adapter'
 import { McpClientAdapter } from '@/adapters/mcp/mcp-client.adapter'
+// Cache
+import { UpstashRedisAdapter } from '@/adapters/cache/upstash-redis.adapter'
+import { InMemoryCacheAdapter } from '@/adapters/cache/in-memory-cache.adapter'
 // Reranker
 import { CohereRerankerAdapter } from '@/adapters/rag/cohere-reranker.adapter'
 import { PassthroughReranker } from '@/core/ports/out/reranker.port'
 // Port types
 import type { AIProviderPort } from '@/core/ports/out/ai-provider.port'
+import type { CachePort } from '@/core/ports/out/cache.port'
 import type { VectorStorePort } from '@/core/ports/out/vector-store.port'
 import type { AgentExecutionStorePort } from '@/core/ports/out/agent-execution-store.port'
 import type { TracerPort } from '@/core/ports/out/tracer.port'
@@ -95,6 +99,7 @@ function createToolRegistry(ragUseCase: RagUseCase): ToolRegistry {
 }
 
 interface Container {
+  cache: CachePort
   aiProvider: AIProviderPort
   vectorStore: VectorStorePort
   chatUseCase: ChatUseCase
@@ -125,8 +130,17 @@ interface Container {
 
 let _container: Container | null = null
 
+function createCache(): CachePort {
+  const env = getEnv()
+  if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+    return new UpstashRedisAdapter()
+  }
+  return new InMemoryCacheAdapter()
+}
+
 function buildContainer(): Container {
   const db = createDb()
+  const cache = createCache()
   const aiProvider = createAIProvider()
   const vectorStore = new PgVectorAdapter(db)
 
@@ -177,6 +191,7 @@ function buildContainer(): Container {
     mcpBundleLoader,
     auditStore,
     tracer,
+    cache,
   )
 
   // T3.1: Observability use case
@@ -209,9 +224,10 @@ function buildContainer(): Container {
   const marketplaceUseCase = new MarketplaceUseCase(marketplaceStore, agentUseCase)
 
   // Workspace use case
-  const workspaceUseCase = new WorkspaceUseCase(workspaceStore)
+  const workspaceUseCase = new WorkspaceUseCase(workspaceStore, cache)
 
   return {
+    cache,
     aiProvider,
     vectorStore,
     chatUseCase,

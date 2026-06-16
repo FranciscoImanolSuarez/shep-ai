@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getEnv } from '@/config/env'
+import { getContainer } from '@/config/container'
 import { MODEL_REGISTRY, PROVIDER_DEFAULTS, getAvailableProviders, type ProviderId } from '@/config/models'
 
 const PROVIDER_NAMES: Record<ProviderId, string> = {
@@ -8,7 +9,15 @@ const PROVIDER_NAMES: Record<ProviderId, string> = {
   ollama:    'Ollama',
 }
 
+const MODELS_CACHE_KEY = 'models:providers'
+const MODELS_CACHE_TTL = 3600 // 1 hour — static env-derived data
+
 export async function GET() {
+  const { cache } = getContainer()
+
+  const cached = await cache.get<{ providers: unknown[] }>(MODELS_CACHE_KEY)
+  if (cached) return NextResponse.json(cached)
+
   const env = getEnv()
   const available = getAvailableProviders(env)
 
@@ -30,5 +39,7 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json({ providers })
+  const payload = { providers }
+  await cache.set(MODELS_CACHE_KEY, payload, MODELS_CACHE_TTL)
+  return NextResponse.json(payload)
 }

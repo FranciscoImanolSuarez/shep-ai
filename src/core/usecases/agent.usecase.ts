@@ -11,7 +11,10 @@ import type { RagPort } from '@/core/ports/in/rag.port'
 import type { McpServerStorePort } from '@/core/ports/out/mcp-server-store.port'
 import type { McpBundleLoaderPort } from '@/core/ports/out/mcp-bundle-loader.port'
 import type { AuditStorePort } from '@/core/ports/out/audit-store.port'
+import type { CachePort } from '@/core/ports/out/cache.port'
 import { DEFAULT_AGENT_CONFIG as defaultConfig } from '@/core/domain/entities/agent'
+
+const AGENTS_LIST_TTL = 30 // seconds
 import type { AgentToolDefinition } from '@/core/domain/entities/agent-tool'
 import { createDelegateAgentTool, createRagSearchTool } from '@/core/tools/builtin'
 import { computeCost } from '@/core/domain/entities/audit-event'
@@ -114,7 +117,17 @@ export class AgentUseCase implements AgentPort {
     private readonly auditStore: AuditStorePort,
     // T1.10: optional tracer — if absent, no spans are emitted
     private readonly tracer?: TracerPort,
+    private readonly cache?: CachePort,
   ) {}
+
+  private agentsListKey(workspaceId: string): string {
+    return `agents:list:${workspaceId}`
+  }
+
+  private async bustAgentsList(workspaceId: string | null | undefined): Promise<void> {
+    if (!workspaceId || !this.cache) return
+    await this.cache.delete(this.agentsListKey(workspaceId))
+  }
 
   // ---------------------------------------------------------------------------
   // D4: extracted trace-setup — shared by runAgent and runAgentToCompletion
@@ -248,7 +261,9 @@ export class AgentUseCase implements AgentPort {
       createdAt: now,
       updatedAt: now,
     }
-    return this.agentStore.save(agent)
+    const saved = await this.agentStore.save(agent)
+    await this.bustAgentsList(saved.workspaceId)
+    return saved
   }
 
   async updateAgent(id: string, input: UpdateAgentInput): Promise<Agent> {
@@ -266,16 +281,31 @@ export class AgentUseCase implements AgentPort {
     if (input.metadata !== undefined) data.metadata = input.metadata
     if ('knowledgeBaseId' in input) data.knowledgeBaseId = input.knowledgeBaseId ?? null
 
-    return this.agentStore.update(id, data)
+    const updated = await this.agentStore.update(id, data)
+    await this.bustAgentsList(existing.workspaceId)
+    return updated
   }
 
   async deleteAgent(id: string): Promise<void> {
-    return this.agentStore.delete(id)
+    const existing = await this.agentStore.findById(id)
+    await this.agentStore.delete(id)
+    await this.bustAgentsList(existing?.workspaceId)
   }
 
   async listAgents(workspaceId?: string): Promise<Agent[]> {
-    if (workspaceId) return this.agentStore.findByWorkspace(workspaceId)
-    return this.agentStore.findAll()
+    // Only cache workspace-scoped queries — the global path is legacy/internal
+    if (!workspaceId) return this.agentStore.findAll()
+
+    if (this.cache) {
+      const cached = await this.cache.get<Agent[]>(this.agentsListKey(workspaceId))
+      if (cached) return cached
+    }
+
+    const list = await this.agentStore.findByWorkspace(workspaceId)
+    if (this.cache) {
+      await this.cache.set(this.agentsListKey(workspaceId), list, AGENTS_LIST_TTL)
+    }
+    return list
   }
 
   async getAgent(id: string): Promise<Agent | null> {

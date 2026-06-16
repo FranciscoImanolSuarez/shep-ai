@@ -2,6 +2,9 @@ import { canDeleteWorkspace, canEditWorkspace, canManageMembers, canTransferOwne
 import type { Workspace, WorkspaceMember, WorkspaceInvitation, Role, WorkspaceWithRole } from '@/core/domain/entities/workspace'
 import type { WorkspacePort, CreateWorkspaceInput, UpdateWorkspaceInput, InviteMemberInput } from '@/core/ports/in/workspace.port'
 import type { WorkspaceStorePort } from '@/core/ports/out/workspace-store.port'
+import type { CachePort } from '@/core/ports/out/cache.port'
+
+const WS_LIST_TTL = 60 // seconds
 
 export class WorkspaceForbiddenError extends Error {
   readonly status = 403
@@ -36,7 +39,18 @@ export class InvitationExpiredError extends Error {
 }
 
 export class WorkspaceUseCase implements WorkspacePort {
-  constructor(private readonly store: WorkspaceStorePort) {}
+  constructor(
+    private readonly store: WorkspaceStorePort,
+    private readonly cache: CachePort,
+  ) {}
+
+  private wsListKey(userId: string): string {
+    return `ws:list:${userId}`
+  }
+
+  private async bustWsList(userId: string): Promise<void> {
+    await this.cache.delete(this.wsListKey(userId))
+  }
 
   private async assertMember(userId: string, workspaceId: string): Promise<WorkspaceMember> {
     const member = await this.store.getMember(workspaceId, userId)
@@ -61,6 +75,7 @@ export class WorkspaceUseCase implements WorkspacePort {
     if (!existing) {
       await this.store.setActiveWorkspace(userId, ws.id)
     }
+    await this.bustWsList(userId)
     return ws
   }
 
@@ -76,12 +91,20 @@ export class WorkspaceUseCase implements WorkspacePort {
 
   async listWorkspaces(userId: string): Promise<WorkspaceWithRole[]> {
     await this.store.upsertUser(userId)
-    return this.store.listWorkspacesByUser(userId)
+    const cached = await this.cache.get<WorkspaceWithRole[]>(this.wsListKey(userId))
+    if (cached) return cached
+    const list = await this.store.listWorkspacesByUser(userId)
+    await this.cache.set(this.wsListKey(userId), list, WS_LIST_TTL)
+    return list
   }
 
   async updateWorkspace(userId: string, workspaceId: string, input: UpdateWorkspaceInput): Promise<Workspace> {
     await this.assertRole(userId, workspaceId, canEditWorkspace)
-    return this.store.updateWorkspace(workspaceId, { ...input, updatedAt: new Date() })
+    const ws = await this.store.updateWorkspace(workspaceId, { ...input, updatedAt: new Date() })
+    // Bust every member of this workspace — names/plan might appear in the list
+    const members = await this.store.listMembers(workspaceId)
+    await Promise.all(members.map((m) => this.bustWsList(m.userId)))
+    return ws
   }
 
   async deleteWorkspace(userId: string, workspaceId: string): Promise<void> {
@@ -91,6 +114,7 @@ export class WorkspaceUseCase implements WorkspacePort {
       throw new WorkspaceConflictError('Remove all members before deleting the workspace.')
     }
     await this.store.deleteWorkspace(workspaceId)
+    await this.bustWsList(userId)
   }
 
   async listMembers(userId: string, workspaceId: string): Promise<WorkspaceMember[]> {
@@ -111,7 +135,10 @@ export class WorkspaceUseCase implements WorkspacePort {
       throw new WorkspaceForbiddenError('Only the owner can assign the owner role.')
     }
 
-    return this.store.updateMemberRole(workspaceId, targetUserId, role)
+    const member = await this.store.updateMemberRole(workspaceId, targetUserId, role)
+    // Bust both actor and target — their workspace list may reflect role metadata
+    await Promise.all([this.bustWsList(userId), this.bustWsList(targetUserId)])
+    return member
   }
 
   async removeMember(userId: string, workspaceId: string, targetUserId: string): Promise<void> {
@@ -123,6 +150,8 @@ export class WorkspaceUseCase implements WorkspacePort {
     }
 
     await this.store.removeMember(workspaceId, targetUserId)
+    // Bust the removed member's list (workspace gone) and actor's list (member count changes)
+    await Promise.all([this.bustWsList(targetUserId), this.bustWsList(userId)])
   }
 
   async inviteMember(userId: string, workspaceId: string, input: InviteMemberInput): Promise<WorkspaceInvitation> {
@@ -131,6 +160,7 @@ export class WorkspaceUseCase implements WorkspacePort {
     const token = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
+    // No bust needed: invitations don't change workspace list until accepted
     return this.store.insertInvitation({
       workspaceId,
       inviterId: userId,
@@ -165,6 +195,8 @@ export class WorkspaceUseCase implements WorkspacePort {
       await this.store.setActiveWorkspace(userId, invitation.workspaceId)
     }
 
+    // New member joins: bust their list (new workspace added)
+    await this.bustWsList(userId)
     return member
   }
 
@@ -172,6 +204,7 @@ export class WorkspaceUseCase implements WorkspacePort {
     const invitation = await this.store.findInvitationById(invitationId)
     if (!invitation) throw new WorkspaceNotFoundError(invitationId)
     await this.store.deleteInvitation(invitationId)
+    // No workspace list change — declining doesn't add/remove a workspace
   }
 
   async transferOwnership(userId: string, workspaceId: string, newOwnerId: string): Promise<void> {
@@ -179,6 +212,8 @@ export class WorkspaceUseCase implements WorkspacePort {
     const newOwnerMember = await this.store.getMember(workspaceId, newOwnerId)
     if (!newOwnerMember) throw new WorkspaceForbiddenError('Target user is not a member of this workspace.')
     await this.store.transferOwnership(workspaceId, userId, newOwnerId)
+    // Bust both old and new owner — roles change in their workspace lists
+    await Promise.all([this.bustWsList(userId), this.bustWsList(newOwnerId)])
   }
 
   async setActiveWorkspace(userId: string, workspaceId: string): Promise<void> {
