@@ -47,7 +47,7 @@ import { computeCost } from '@/core/domain/entities/audit-event'
  * preceding the marked block, so this caches system prompt + tools + all prior turns.
  * 90% discount on cache reads. No-op for non-Anthropic providers.
  */
-function addCacheControl(messages: ModelMessage[], provider: AgentProvider): ModelMessage[] {
+export function addCacheControl(messages: ModelMessage[], provider: AgentProvider): ModelMessage[] {
   if (provider !== 'anthropic') return messages
   if (messages.length === 0) return messages
   return messages.map((msg, i) =>
@@ -175,7 +175,7 @@ const providerToolResolvers: Record<string, (provider: AgentProvider) => ToolSet
   },
 }
 
-function convertTools(definitions: AgentToolDefinition[], provider: AgentProvider): ToolSet {
+export function convertTools(definitions: AgentToolDefinition[], provider: AgentProvider): ToolSet {
   const sdkTools: ToolSet = {}
 
   for (const def of definitions) {

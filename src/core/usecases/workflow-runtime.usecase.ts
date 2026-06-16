@@ -10,6 +10,97 @@ import type { WorkflowNode } from '@/core/domain/entities/workflow-node'
 import type { Message } from '@/core/domain/entities/message'
 import { topologicalSort } from './workflow-dag'
 
+// ---------------------------------------------------------------------------
+// Exported pure helpers — extracted for testability (no behaviour change)
+// ---------------------------------------------------------------------------
+
+/**
+ * Transitively marks a node and its downstream dependents as skipped.
+ * Only marks nodes that have NO non-skipped incoming edges remaining.
+ * (The "diamond rule": a node is only skipped if ALL its incoming edges come
+ *  from already-skipped nodes.)
+ */
+export function markTransitiveSkips(
+  startNodeId: string,
+  edges: WorkflowDefinition['edges'],
+  skippedNodes: Set<string>,
+): void {
+  const toVisit = [startNodeId]
+  while (toVisit.length > 0) {
+    const nodeId = toVisit.pop()!
+    if (skippedNodes.has(nodeId)) continue
+    skippedNodes.add(nodeId)
+    for (const edge of edges) {
+      if (edge.source !== nodeId) continue
+      const target = edge.target
+      if (skippedNodes.has(target)) continue
+      const incomingToTarget = edges.filter((e) => e.target === target)
+      const allIncomingSkipped = incomingToTarget.every((e) => skippedNodes.has(e.source))
+      if (allIncomingSkipped) {
+        toVisit.push(target)
+      }
+    }
+  }
+}
+
+/**
+ * Resolves the primary incoming value for a node from the nodeOutputs map.
+ * Single edge → direct value. Multiple edges → keyed object.
+ */
+export function getIncomingValue(
+  nodeId: string,
+  edges: WorkflowDefinition['edges'],
+  nodeOutputs: Record<string, unknown>,
+): unknown {
+  const incomingEdges = edges.filter((e) => e.target === nodeId)
+  if (incomingEdges.length === 0) return undefined
+  if (incomingEdges.length === 1) {
+    return nodeOutputs[incomingEdges[0].source]
+  }
+  const result: Record<string, unknown> = {}
+  for (const edge of incomingEdges) {
+    result[edge.source] = nodeOutputs[edge.source]
+  }
+  return result
+}
+
+/**
+ * Resolves the output-node template `"Hello {{nodeId}}"` against a nodeOutputs map.
+ * Unknown references resolve to ''.
+ */
+export function resolveOutputTemplate(
+  template: string,
+  nodeOutputs: Record<string, unknown>,
+): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_match: string, nodeId: string) => {
+    const val = nodeOutputs[nodeId]
+    return val !== undefined ? String(val) : ''
+  })
+}
+
+/**
+ * Builds the prompt string for an agent node.
+ * If the node has `inputTemplate`, renders it against nodeOutputs;
+ * otherwise stringifies incomingValue (string → pass-through; object → JSON.stringify).
+ */
+export function buildAgentPrompt(
+  inputTemplate: string | undefined,
+  nodeOutputs: Record<string, unknown>,
+  incomingValue: unknown,
+): string {
+  if (inputTemplate) {
+    return inputTemplate.replace(/\{\{(\w+)\}\}/g, (_match: string, nid: string) => {
+      const val = nodeOutputs[nid]
+      return val !== undefined ? String(val) : ''
+    })
+  }
+  if (incomingValue === undefined) return ''
+  if (typeof incomingValue === 'string') return incomingValue
+  return JSON.stringify(incomingValue)
+}
+
+// ---------------------------------------------------------------------------
+
 interface ExecutionResult {
   status: 'completed' | 'failed'
   output?: Record<string, unknown>
@@ -288,12 +379,7 @@ export class WorkflowRuntimeUseCase {
         // T2.11: output node renders template or passes through upstream output
         const incomingValue = this.getIncomingValue(node.id, snapshot, context)
         if (node.config.template) {
-          // v1 template: replace {{nodeId}} placeholders with JSON values
-          const rendered = node.config.template.replace(/\{\{(\w+)\}\}/g, (_match: string, nodeId: string) => {
-            const val = context.nodeOutputs[nodeId]
-            return val !== undefined ? String(val) : ''
-          })
-          return rendered
+          return resolveOutputTemplate(node.config.template, context.nodeOutputs)
         }
         return incomingValue
       }
@@ -327,7 +413,9 @@ export class WorkflowRuntimeUseCase {
       case 'agent': {
         // T2.14: delegate to AgentUseCase.runAgentToCompletion
         const incomingValue = this.getIncomingValue(node.id, snapshot, context)
-        const prompt = this.buildAgentPrompt(node.id, snapshot, context, incomingValue)
+        const agentNode = snapshot.nodes.find((n) => n.id === node.id)
+        const inputTemplate = agentNode?.type === 'agent' ? agentNode.config.inputTemplate : undefined
+        const prompt = buildAgentPrompt(inputTemplate, context.nodeOutputs, incomingValue)
 
         // T2.15: start an agent span as child of node span for trace nesting
         let agentParentSpanId = nodeSpanId
@@ -380,70 +468,21 @@ export class WorkflowRuntimeUseCase {
 
   /**
    * Gets the primary incoming value for a node from the first upstream output.
+   * Delegates to the exported pure helper `getIncomingValue`.
    */
   private getIncomingValue(nodeId: string, snapshot: WorkflowDefinition, context: NodeContext): unknown {
-    const incomingEdges = snapshot.edges.filter((e) => e.target === nodeId)
-    if (incomingEdges.length === 0) return undefined
-    if (incomingEdges.length === 1) {
-      return context.nodeOutputs[incomingEdges[0].source]
-    }
-    // Multiple incoming edges — return as an object keyed by source node ID
-    const result: Record<string, unknown> = {}
-    for (const edge of incomingEdges) {
-      result[edge.source] = context.nodeOutputs[edge.source]
-    }
-    return result
-  }
-
-  /**
-   * Builds the prompt for an agent node. If the node has an inputTemplate, uses it;
-   * otherwise derives from the single upstream value (string) or JSON.
-   */
-  private buildAgentPrompt(
-    nodeId: string,
-    snapshot: WorkflowDefinition,
-    context: NodeContext,
-    incomingValue: unknown,
-  ): string {
-    const node = snapshot.nodes.find((n) => n.id === nodeId)
-    if (node?.type === 'agent' && node.config.inputTemplate) {
-      return node.config.inputTemplate.replace(/\{\{(\w+)\}\}/g, (_match: string, nid: string) => {
-        const val = context.nodeOutputs[nid]
-        return val !== undefined ? String(val) : ''
-      })
-    }
-
-    if (incomingValue === undefined) return ''
-    if (typeof incomingValue === 'string') return incomingValue
-    return JSON.stringify(incomingValue)
+    return getIncomingValue(nodeId, snapshot.edges, context.nodeOutputs)
   }
 
   /**
    * Transitively marks a node and its downstream dependents as skipped.
-   * Only marks nodes that have NO non-skipped incoming edges remaining.
+   * Delegates to the exported pure helper `markTransitiveSkips`.
    */
   private markTransitiveSkips(
     startNodeId: string,
     snapshot: WorkflowDefinition,
     skippedNodes: Set<string>,
   ): void {
-    const toVisit = [startNodeId]
-    while (toVisit.length > 0) {
-      const nodeId = toVisit.pop()!
-      if (skippedNodes.has(nodeId)) continue
-      skippedNodes.add(nodeId)
-      // Skip downstream nodes (only if ALL their incoming edges come from skipped nodes)
-      for (const edge of snapshot.edges) {
-        if (edge.source !== nodeId) continue
-        const target = edge.target
-        if (skippedNodes.has(target)) continue
-        // Check if all incoming edges to target are from skipped nodes
-        const incomingToTarget = snapshot.edges.filter((e) => e.target === target)
-        const allIncomingSkipped = incomingToTarget.every((e) => skippedNodes.has(e.source))
-        if (allIncomingSkipped) {
-          toVisit.push(target)
-        }
-      }
-    }
+    markTransitiveSkips(startNodeId, snapshot.edges, skippedNodes)
   }
 }
