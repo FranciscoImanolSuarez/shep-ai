@@ -14,7 +14,13 @@ import {
   PencilIcon,
   CopyIcon,
   SearchIcon,
+  GlobeIcon,
+  BookOpenIcon,
+  ClockIcon,
+  PlugIcon,
+  WrenchIcon,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import {
   Dialog,
@@ -120,6 +126,44 @@ function relativeTime(iso: string | null): string {
   return new Date(iso).toLocaleDateString()
 }
 
+// Friendly metadata for built-in tools so cards show product labels, not raw ids.
+const BUILTIN_TOOL_META: Record<string, { label: string; Icon: LucideIcon }> = {
+  'web-search': { label: 'Web search', Icon: GlobeIcon },
+  'rag-search': { label: 'Knowledge base', Icon: BookOpenIcon },
+  'get-current-time': { label: 'Current time', Icon: ClockIcon },
+}
+
+interface ToolPillData {
+  key: string
+  label: string
+  Icon: LucideIcon
+}
+
+/** Resolve an agent's toolIds into glanceable, human-labelled pills. */
+function resolveToolPills(toolIds: string[], agents: AgentData[]): ToolPillData[] {
+  return toolIds.map((id) => {
+    if (id.startsWith('agent:')) {
+      const subId = id.slice('agent:'.length)
+      const sub = agents.find((a) => a.id === subId)
+      return { key: id, label: sub?.name ?? `Agent ${subId.slice(0, 6)}`, Icon: BotIcon }
+    }
+    if (id.startsWith('mcp:')) {
+      return { key: id, label: 'MCP server', Icon: PlugIcon }
+    }
+    const meta = BUILTIN_TOOL_META[id]
+    return { key: id, label: meta?.label ?? id, Icon: meta?.Icon ?? WrenchIcon }
+  })
+}
+
+function ToolPill({ label, Icon }: { label: string; Icon: LucideIcon }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-secondary/70 border border-border/50 rounded-full pl-1.5 pr-2 py-0.5">
+      <Icon className="size-2.5 shrink-0" strokeWidth={2} />
+      <span className="truncate max-w-[120px]">{label}</span>
+    </span>
+  )
+}
+
 function StatusBadge({ status }: { status: AgentExecution['status'] }) {
   const variantMap: Record<AgentExecution['status'], 'warning' | 'success' | 'danger'> = {
     running: 'warning',
@@ -173,15 +217,23 @@ function AgentStatsRow({ agentId }: { agentId: string }) {
 
   if (!stats) return <div className="h-4" />
 
+  const rateColor =
+    stats.successRate >= 90 ? 'bg-emerald-500'
+      : stats.successRate >= 60 ? 'bg-amber-500'
+        : 'bg-red-500'
+
   return (
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <span>{stats.totalRuns} run{stats.totalRuns !== 1 ? 's' : ''}</span>
+      <span className="tabular-nums">{stats.totalRuns} run{stats.totalRuns !== 1 ? 's' : ''}</span>
       {stats.totalRuns > 0 && (
         <>
-          <span>·</span>
-          <span>{stats.successRate}% success</span>
-          <span>·</span>
-          <span>last {relativeTime(stats.lastRunAt)}</span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="inline-flex items-center gap-1 tabular-nums">
+            <span className={`size-1.5 rounded-full shrink-0 ${rateColor}`} />
+            {stats.successRate}%
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span>{relativeTime(stats.lastRunAt)}</span>
         </>
       )}
     </div>
@@ -214,10 +266,6 @@ function AgentCard({
   const [runMeta, setRunMeta] = useState<{ tokens?: number; steps?: number } | null>(null)
   const [childExecutions, setChildExecutions] = useState<AgentExecution[]>([])
 
-  const subAgentIds = agent.toolIds.filter((t) => t.startsWith('agent:'))
-  const builtinIds = agent.toolIds.filter((t) => !t.startsWith('agent:') && !t.startsWith('mcp:'))
-  const mcpIds = agent.toolIds.filter((t) => t.startsWith('mcp:'))
-
   async function handleRun() {
     if (!runInput.trim()) return
     setRunOutput('')
@@ -235,7 +283,7 @@ function AgentCard({
   }
 
   return (
-    <div className="border border-border rounded-xl hover:border-foreground/20 transition-colors flex flex-col">
+    <div className="border border-border rounded-xl hover:border-foreground/20 hover:shadow-sm transition-all flex flex-col">
       {/* Card header */}
       <div className="p-4 flex-1">
         <div className="flex items-start gap-3 mb-3">
@@ -291,35 +339,19 @@ function AgentCard({
         )}
 
         {/* Tool pills */}
-        {(subAgentIds.length > 0 || builtinIds.length > 0 || mcpIds.length > 0) && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {builtinIds.slice(0, 2).map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 text-[10px] bg-secondary rounded-full px-2 py-0.5">
-                <span className="size-1.5 rounded-full bg-blue-500 shrink-0" />
-                {t}
-              </span>
-            ))}
-            {mcpIds.slice(0, 2).map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 text-[10px] bg-secondary rounded-full px-2 py-0.5">
-                <span className="size-1.5 rounded-full bg-violet-500 shrink-0" />
-                {t.slice('mcp:'.length)}
-              </span>
-            ))}
-            {subAgentIds.slice(0, 2).map((t) => {
-              const subId = t.slice('agent:'.length)
-              const sub = agents.find((a) => a.id === subId)
-              return (
-                <span key={t} className="inline-flex items-center gap-1 text-[10px] bg-secondary rounded-full px-2 py-0.5">
-                  <BotIcon className="size-2.5" />
-                  {sub?.name ?? subId.slice(0, 8)}
-                </span>
-              )
-            })}
-            {agent.toolIds.length > 6 && (
-              <span className="text-[10px] text-muted-foreground">+{agent.toolIds.length - 6} more</span>
-            )}
-          </div>
-        )}
+        {agent.toolIds.length > 0 && (() => {
+          const pills = resolveToolPills(agent.toolIds, agents)
+          const shown = pills.slice(0, 4)
+          const extra = pills.length - shown.length
+          return (
+            <div className="flex flex-wrap items-center gap-1 mb-3">
+              {shown.map((p) => <ToolPill key={p.key} label={p.label} Icon={p.Icon} />)}
+              {extra > 0 && (
+                <span className="text-[10px] text-muted-foreground px-1">+{extra} more</span>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Stats */}
         <AgentStatsRow agentId={agent.id} />
@@ -349,22 +381,25 @@ function AgentCard({
               <p className="text-xs bg-secondary rounded-md p-2 whitespace-pre-wrap line-clamp-3">{agent.systemPrompt}</p>
             </div>
           )}
-          <div className="flex gap-2">
-            <input
+          <div className="space-y-2">
+            <textarea
               value={runInput}
               onChange={(e) => setRunInput(e.target.value)}
-              placeholder="Enter input…"
-              className="flex-1 px-3 py-1.5 rounded-md border border-input bg-background text-sm"
-              onKeyDown={(e) => e.key === 'Enter' && handleRun()}
+              placeholder="Enter input… (⌘↵ to run)"
+              rows={2}
+              className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleRun() }
+              }}
               disabled={runningId}
             />
             <button
               onClick={handleRun}
               disabled={runningId || !runInput.trim()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
             >
               {runningId ? <Spinner size="sm" /> : <PlayIcon className="size-3" />}
-              {runningId ? 'Running…' : 'Run'}
+              {runningId ? 'Running…' : 'Run agent'}
             </button>
           </div>
 
@@ -753,6 +788,11 @@ export default function AgentsPage() {
                 ))}
               </div>
             )}
+            <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
+              {visibleAgents.length === agents.length
+                ? `${agents.length} agent${agents.length !== 1 ? 's' : ''}`
+                : `${visibleAgents.length} of ${agents.length}`}
+            </span>
           </div>
         )}
 
