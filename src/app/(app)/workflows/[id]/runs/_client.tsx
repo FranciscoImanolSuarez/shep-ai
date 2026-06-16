@@ -1,0 +1,149 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { NetworkIcon, ExternalLinkIcon, ArrowLeftIcon } from 'lucide-react'
+import type { WorkflowRun, WorkflowRunStatus } from '@/core/domain/entities/workflow-run'
+import { Hero } from '@/components/shared/Hero'
+import { PageBody } from '@/components/shared/PageHeader'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { Badge } from '@/components/shared/Badge'
+import { DataTable } from '@/components/shared/DataTable'
+import { Button } from '@/components/ui/button'
+
+const STATUS_VARIANT: Record<WorkflowRunStatus, 'warning' | 'success' | 'danger'> = {
+  running: 'warning',
+  completed: 'success',
+  failed: 'danger',
+}
+
+function StatusBadge({ status }: { status: WorkflowRunStatus }) {
+  return <Badge variant={STATUS_VARIANT[status]}>{status}</Badge>
+}
+
+function formatDuration(ms?: number | null): string {
+  if (ms == null) return '—'
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(2)}s`
+}
+
+function formatDate(d: Date | string): string {
+  return new Date(d).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+interface Props {
+  workflowId: string
+  workflowName: string | null
+  initialRuns: WorkflowRun[]
+}
+
+export function WorkflowRunsClient({ workflowId, workflowName, initialRuns }: Props) {
+  const [runs, setRuns] = useState<WorkflowRun[]>(initialRuns)
+
+  // P2.2 — when WORKFLOW_EXECUTOR=inngest, POST /runs returns immediately with
+  // status='running' and the Inngest worker updates the row in the background.
+  // Poll while ANY run is still running so the UI converges to its final state
+  // without forcing a manual refresh. Polling stops as soon as every run is
+  // either completed or failed.
+  useEffect(() => {
+    const hasRunning = runs.some((r) => r.status === 'running')
+    if (!hasRunning) return
+
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await fetch(`/api/workflows/${workflowId}/runs`).then((r) => r.json())
+        if (Array.isArray(fresh)) setRuns(fresh)
+      } catch {
+        // Best-effort — keep the previous list on transient failures
+      }
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [workflowId, runs])
+
+  const backAction = (
+    <Button variant="ghost" size="sm" render={<Link href={`/workflows/${workflowId}/edit`} />}>
+      <ArrowLeftIcon className="size-3.5" />
+      Back to editor
+    </Button>
+  )
+
+  return (
+    <div className="flex-1 overflow-auto">
+      <Hero
+        eyebrow="BUILD"
+        title={workflowName ? `${workflowName} runs` : 'Runs'}
+        description="Execution history for this workflow — click a trace to debug"
+        variant="default"
+        actions={backAction}
+        stats={runs.length > 0 ? [{ label: 'Total runs', value: runs.length }] : undefined}
+      />
+
+      <PageBody className="space-y-6">
+        <DataTable
+          headers={['Status', 'Started', 'Duration', 'Error', 'Trace']}
+          loading={false}
+          loadingRows={4}
+          empty={
+            runs.length === 0 ? (
+              <EmptyState
+                icon={NetworkIcon}
+                title="No runs yet"
+                description="Open the editor to trigger your first workflow run."
+                action={
+                  <Button size="sm" render={<Link href={`/workflows/${workflowId}/edit`} />}>
+                    Open editor
+                  </Button>
+                }
+              />
+            ) : undefined
+          }
+        >
+          {runs.map((run) => (
+            <tr
+              key={run.id}
+              className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+            >
+              <td className="px-4 py-3">
+                <StatusBadge status={run.status} />
+              </td>
+              <td className="px-4 py-3 text-muted-foreground text-xs hidden sm:table-cell">
+                {formatDate(run.startedAt)}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground text-xs hidden md:table-cell">
+                {formatDuration(run.durationMs)}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground text-xs max-w-[200px] truncate hidden lg:table-cell">
+                {run.errorMessage ?? '—'}
+              </td>
+              <td className="px-4 py-3 text-right">
+                {run.traceId ? (
+                  <Link
+                    href={`/observability/${run.traceId}`}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    title="View trace in Observability"
+                  >
+                    <ExternalLinkIcon className="size-3" />
+                    Trace
+                  </Link>
+                ) : (
+                  <span
+                    className="text-xs text-muted-foreground cursor-not-allowed"
+                    title="Trace unavailable"
+                  >
+                    No trace
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      </PageBody>
+    </div>
+  )
+}
