@@ -34,20 +34,17 @@ export async function getActiveWorkspaceContext(): Promise<WorkspaceContext | nu
   const userId = session.user.email
   const container = getContainer()
 
-  // Lazily import to avoid circular — workspaceUseCase is wired in container
-  const workspaceUseCase = (container as unknown as Record<string, unknown>).workspaceUseCase as import('@/core/usecases/workspace.usecase').WorkspaceUseCase | undefined
-  if (!workspaceUseCase) return null
+  const { workspaceUseCase, workspaceStore } = container
 
   try {
     const workspaces = await workspaceUseCase.listWorkspaces(userId)
     if (workspaces.length === 0) return null
 
     // Try to find the active one
-    const store = (container as unknown as Record<string, unknown>).workspaceStore as import('@/adapters/db/workspace-store.adapter').WorkspaceStoreAdapter | undefined
     let activeId: string | null = null
 
-    if (store) {
-      activeId = await store.getActiveWorkspaceId(userId)
+    if ('getActiveWorkspaceId' in workspaceStore && typeof workspaceStore.getActiveWorkspaceId === 'function') {
+      activeId = await (workspaceStore as import('@/adapters/db/workspace-store.adapter').WorkspaceStoreAdapter).getActiveWorkspaceId(userId)
     }
 
     const activeWorkspace = workspaces.find((w) => w.id === activeId) ?? workspaces[0]

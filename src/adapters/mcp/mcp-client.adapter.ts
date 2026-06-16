@@ -2,6 +2,7 @@ import { createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import type { McpServer } from '@/core/domain/entities/mcp-server'
 import type { AgentToolDefinition } from '@/core/domain/entities/agent-tool'
+import type { McpBundleLoaderPort } from '@/core/ports/out/mcp-bundle-loader.port'
 
 export interface LoadedMcpBundle {
   /** AgentToolDefinitions ready to merge into resolveTools output. */
@@ -61,5 +62,14 @@ export async function loadMcpBundle(server: McpServer): Promise<LoadedMcpBundle>
         // Best-effort: a transport already torn down should not break the run
       }
     },
+  }
+}
+
+/**
+ * Adapter class wrapping `loadMcpBundle` to satisfy `McpBundleLoaderPort`.
+ */
+export class McpClientAdapter implements McpBundleLoaderPort {
+  async loadBundle(server: McpServer): Promise<{ tools: AgentToolDefinition[]; close: () => Promise<void> }> {
+    return loadMcpBundle(server)
   }
 }

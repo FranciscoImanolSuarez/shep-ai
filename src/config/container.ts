@@ -17,7 +17,7 @@ import { ScheduledAgentUseCase } from '@/core/usecases/scheduled-agent.usecase'
 import { AuditStoreAdapter } from '@/adapters/db/audit-store.adapter'
 import { KnowledgeBaseStoreAdapter } from '@/adapters/db/knowledge-base-store.adapter'
 import { KnowledgeBaseUseCase } from '@/core/usecases/knowledge-base.usecase'
-import { ToolRegistry, createRagSearchTool, getCurrentTimeTool, webSearchTool, createDelegateAgentTool } from '@/core/tools'
+import { ToolRegistry, createRagSearchTool, getCurrentTimeTool, webSearchTool } from '@/core/tools'
 import { ExportUseCase } from '@/core/usecases/export.usecase'
 import { MarkdownExporter } from '@/adapters/export/markdown.adapter'
 import { PdfExporter } from '@/adapters/export/pdf.adapter'
@@ -36,7 +36,20 @@ import { WorkflowRuntimeUseCase } from '@/core/usecases/workflow-runtime.usecase
 import { WorkflowUseCase } from '@/core/usecases/workflow.usecase'
 // P0.3: MCP
 import { McpServerStoreAdapter } from '@/adapters/db/mcp-server-store.adapter'
+import { McpClientAdapter } from '@/adapters/mcp/mcp-client.adapter'
+// Reranker
+import { CohereRerankerAdapter } from '@/adapters/rag/cohere-reranker.adapter'
+import { PassthroughReranker } from '@/core/ports/out/reranker.port'
+// Port types
 import type { AIProviderPort } from '@/core/ports/out/ai-provider.port'
+import type { VectorStorePort } from '@/core/ports/out/vector-store.port'
+import type { AgentExecutionStorePort } from '@/core/ports/out/agent-execution-store.port'
+import type { TracerPort } from '@/core/ports/out/tracer.port'
+import type { WorkspaceStorePort } from '@/core/ports/out/workspace-store.port'
+import type { KnowledgeBaseStorePort } from '@/core/ports/out/knowledge-base-store.port'
+import type { WorkflowStorePort } from '@/core/ports/out/workflow-store.port'
+import type { McpServerStorePort } from '@/core/ports/out/mcp-server-store.port'
+import type { FileSourcePort } from '@/core/ports/out/file-source.port'
 import type { RagConfig } from '@/core/usecases/rag.usecase'
 import type { ExporterPort, ExportFormat } from '@/core/ports/out/exporter.port'
 
@@ -73,37 +86,41 @@ function createToolRegistry(ragUseCase: RagUseCase): ToolRegistry {
   registry.register(createRagSearchTool(ragUseCase))
   registry.register(getCurrentTimeTool)
   registry.register(webSearchTool)
-  registry.register(createDelegateAgentTool(() => getContainer()))
+  // Note: delegate-agent tools are created per-run inside resolveTools (with
+  // the per-run trace context baked in). The generic placeholder is no longer
+  // eagerly registered here because the tool now requires the runner callback
+  // and auditStore injected at resolution time. Agents using 'agent:' tool ids
+  // will get their baked delegation tools in resolveTools — not from the registry.
   return registry
 }
 
 interface Container {
   aiProvider: AIProviderPort
-  vectorStore: PgVectorAdapter
+  vectorStore: VectorStorePort
   chatUseCase: ChatUseCase
   ragUseCase: RagUseCase
   agentUseCase: AgentUseCase
-  executionStore: AgentExecutionStoreAdapter
+  executionStore: AgentExecutionStorePort
   toolRegistry: ToolRegistry
-  fileSource: GoogleDriveAdapter
+  fileSource: FileSourcePort
   conversationUseCase: ConversationUseCase
   scheduledAgentUseCase: ScheduledAgentUseCase
   auditStore: AuditStoreAdapter
-  knowledgeBaseStore: KnowledgeBaseStoreAdapter
+  knowledgeBaseStore: KnowledgeBaseStorePort
   knowledgeBaseUseCase: KnowledgeBaseUseCase
   exportUseCase: ExportUseCase
   marketplaceUseCase: MarketplaceUseCase
-  workspaceStore: WorkspaceStoreAdapter
+  workspaceStore: WorkspaceStorePort
   workspaceUseCase: WorkspaceUseCase
   // T3.1: Observability
   observabilityUseCase: ObservabilityUseCase
-  tracer: DbTracerAdapter
+  tracer: TracerPort
   // T3.2: Workflows
   workflowUseCase: WorkflowUseCase
   workflowRuntimeUseCase: WorkflowRuntimeUseCase
-  workflowStore: WorkflowStoreAdapter
+  workflowStore: WorkflowStorePort
   // P0.3: MCP
-  mcpServerStore: McpServerStoreAdapter
+  mcpServerStore: McpServerStorePort
 }
 
 let _container: Container | null = null
@@ -127,15 +144,21 @@ function buildContainer(): Container {
   const traceStore = new TraceStoreAdapter(db)
   const tracer = new DbTracerAdapter(traceStore)
   const workflowStore = new WorkflowStoreAdapter(db)
-  // P0.3: MCP server config store
+  // P0.3: MCP server config store + bundle loader
   const mcpServerStore = new McpServerStoreAdapter(db)
+  const mcpBundleLoader = new McpClientAdapter()
+
+  // Reranker — use Cohere when API key is set, passthrough otherwise
+  const reranker = process.env.COHERE_API_KEY
+    ? new CohereRerankerAdapter()
+    : new PassthroughReranker()
 
   // External file sources
   const fileSource = new GoogleDriveAdapter()
 
   // Use cases
   const chatUseCase = new ChatUseCase(aiProvider)
-  const ragUseCase = new RagUseCase(aiProvider, vectorStore, getRagConfig())
+  const ragUseCase = new RagUseCase(aiProvider, vectorStore, getRagConfig(), reranker)
 
   // Tools & Runner
   const toolRegistry = createToolRegistry(ragUseCase)
@@ -143,13 +166,16 @@ function buildContainer(): Container {
   // T3.1: AgentRunnerAdapter now receives tracer for span emission
   const agentRunner = new AgentRunnerAdapter(tracer)
 
-  // Agent use case (fully wired — T3.1: tracer injected as 6th arg)
+  // Agent use case — all dependencies injected as explicit ports (no container getter)
   const agentUseCase = new AgentUseCase(
     agentStore,
     executionStore,
     toolRegistry,
     agentRunner,
-    () => getContainer(),
+    ragUseCase,
+    mcpServerStore,
+    mcpBundleLoader,
+    auditStore,
     tracer,
   )
 

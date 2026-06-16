@@ -3,7 +3,7 @@ import type { Document, DocumentChunk } from '@/core/domain/entities/document'
 import type { IngestInput, QueryInput, RagPort, RagQueryResult } from '@/core/ports/in/rag.port'
 import type { AIProviderPort } from '@/core/ports/out/ai-provider.port'
 import type { VectorStorePort } from '@/core/ports/out/vector-store.port'
-import { rerankChunks } from '@/adapters/rag/cohere-reranker.adapter'
+import type { RerankerPort } from '@/core/ports/out/reranker.port'
 
 export interface RagConfig {
   embeddingModel: string
@@ -16,6 +16,7 @@ export class RagUseCase implements RagPort {
     private readonly aiProvider: AIProviderPort,
     private readonly vectorStore: VectorStorePort,
     private readonly config: RagConfig,
+    private readonly reranker: RerankerPort,
   ) {}
 
   async ingest(input: IngestInput): Promise<Document> {
@@ -71,8 +72,8 @@ export class RagUseCase implements RagPort {
       input.knowledgeBaseId,
     )
 
-    // P1.5: cross-encoder rerank when COHERE_API_KEY is set; pass-through otherwise.
-    const results = await rerankChunks(input.query, candidates, topK)
+    // P1.5: cross-encoder rerank when a real reranker is injected; pass-through otherwise.
+    const results = await this.reranker.rerank(input.query, candidates, topK)
 
     const context = results
       .map((r) => r.chunk.content)

@@ -31,20 +31,15 @@ describe('computeCost', () => {
     expect(opusRate).not.toBe(MODEL_COST_PER_1K_TOKENS['claude-3-haiku-20240307'])
   })
 
-  it('gpt-4o-mini does NOT accidentally resolve to gpt-4o rate (substring direction check)', () => {
-    // computeCost uses: normalized.includes(k) || k.includes(normalized)
-    // 'gpt-4o-mini'.includes('gpt-4o') is TRUE so the first key that matches in
-    // Object.keys() iteration order wins. The keys are insertion-ordered and
-    // 'gpt-4o' appears BEFORE 'gpt-4o-mini', so gpt-4o-mini currently resolves
-    // to the gpt-4o rate via the reverse-containment branch (k.includes(normalized)
-    // for 'gpt-4o'.includes('gpt-4o-mini') = false, but normalized.includes(k) =
-    // 'gpt-4o-mini'.includes('gpt-4o') = true).
-    // TODO: latent bug — 'gpt-4o-mini' is matched by the 'gpt-4o' key first because
-    // 'gpt-4o-mini'.includes('gpt-4o') is true and 'gpt-4o' appears earlier in the
-    // map; this means gpt-4o-mini is priced at the gpt-4o rate ($0.01/1K) instead
-    // of its own rate ($0.000375/1K). Pin current (wrong) behaviour here.
+  it('gpt-4o-mini resolves to its own rate, NOT the gpt-4o rate', () => {
+    // Fixed: computeCost now prefers an exact match first, then the longest
+    // matching key, so 'gpt-4o-mini' (length 10) beats 'gpt-4o' (length 6)
+    // and uses the correct $0.000375/1K rate instead of $0.01/1K.
+    const miniRate = MODEL_COST_PER_1K_TOKENS['gpt-4o-mini']
+    expect(computeCost('gpt-4o-mini', 1000)).toBe((1000 / 1000) * miniRate)
+    // Confirm the gpt-4o rate is NOT applied
     const gpt4oRate = MODEL_COST_PER_1K_TOKENS['gpt-4o']
-    expect(computeCost('gpt-4o-mini', 1000)).toBe((1000 / 1000) * gpt4oRate)
+    expect(computeCost('gpt-4o-mini', 1000)).not.toBe((1000 / 1000) * gpt4oRate)
   })
 
   it('returns undefined for a completely unknown model', () => {

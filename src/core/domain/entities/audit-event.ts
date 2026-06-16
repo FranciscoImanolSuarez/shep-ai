@@ -35,9 +35,17 @@ export const MODEL_COST_PER_1K_TOKENS: Record<string, number> = {
 
 export function computeCost(model: string, tokenCount: number): number | undefined {
   const normalized = model.toLowerCase()
-  const key = Object.keys(MODEL_COST_PER_1K_TOKENS).find((k) =>
-    normalized.includes(k) || k.includes(normalized),
-  )
-  if (!key) return undefined
+  const keys = Object.keys(MODEL_COST_PER_1K_TOKENS)
+
+  // 1. Exact match takes priority
+  if (normalized in MODEL_COST_PER_1K_TOKENS) {
+    return (tokenCount / 1000) * MODEL_COST_PER_1K_TOKENS[normalized]
+  }
+
+  // 2. Longest matching key (substring either direction) — avoids gpt-4o
+  //    winning over gpt-4o-mini because it appears first in insertion order.
+  const candidates = keys.filter((k) => normalized.includes(k) || k.includes(normalized))
+  if (candidates.length === 0) return undefined
+  const key = candidates.reduce((best, k) => (k.length > best.length ? k : best))
   return (tokenCount / 1000) * MODEL_COST_PER_1K_TOKENS[key]
 }

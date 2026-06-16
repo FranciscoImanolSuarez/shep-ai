@@ -104,14 +104,22 @@ describe('buildMemorySnippet', () => {
     expect(snippet).not.toContain('x'.repeat(241))
   })
 
-  it('user message content that is an object produces [object Object] — latent bug', () => {
-    // TODO: latent bug — non-string content (e.g. a structured message part)
-    // yields '[object Object]' in the memory snippet because the code calls
-    // String(firstUserMsg) without checking the type.
+  it('user message content that is a parts array extracts the text field', () => {
+    // Fixed: buildMemorySnippet now checks whether content is a string or an
+    // array of {type, text} parts and joins the text parts instead of
+    // falling back to String() which produced '[object Object]'.
     const exec = makeExecution({
-      input: [{ id: 'msg-1', role: 'user', content: { text: 'hello' } as unknown as string, createdAt: new Date() }],
+      input: [
+        {
+          id: 'msg-1',
+          role: 'user',
+          content: [{ type: 'text', text: 'hello from parts' }] as unknown as string,
+          createdAt: new Date(),
+        },
+      ],
     })
     const snippet = buildMemorySnippet([exec])
-    expect(snippet).toContain('[object Object]')
+    expect(snippet).toContain('hello from parts')
+    expect(snippet).not.toContain('[object Object]')
   })
 })

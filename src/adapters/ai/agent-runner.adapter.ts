@@ -39,6 +39,7 @@ import type { AgentToolDefinition } from '@/core/domain/entities/agent-tool'
 import type { AgentStep, AgentToolCall } from '@/core/domain/entities/agent-execution'
 import type { Message } from '@/core/domain/entities/message'
 import type { TracerPort, TraceContext } from '@/core/ports/out/tracer.port'
+import type { AgentRunnerPort } from '@/core/ports/out/agent-runner.port'
 import { computeCost } from '@/core/domain/entities/audit-event'
 
 /**
@@ -315,7 +316,7 @@ function emitStepSpans(
   }
 }
 
-export class AgentRunnerAdapter {
+export class AgentRunnerAdapter implements AgentRunnerPort {
   constructor(
     // T1.8: optional tracer — existing instances without it still work
     private readonly tracer?: TracerPort,

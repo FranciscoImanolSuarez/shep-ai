@@ -1,7 +1,9 @@
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import type { AgentToolDefinition } from '@/core/domain/entities/agent-tool'
+import type { RunAgentInput } from '@/core/ports/in/agent.port'
 import { computeCost } from '@/core/domain/entities/audit-event'
+import type { AuditStorePort } from '@/core/ports/out/audit-store.port'
 
 const genericInputSchema = z.object({
   agentId: z.string().describe('The ID of the agent to delegate to'),
@@ -23,11 +25,19 @@ export interface DelegateAgentContext {
   __workspaceId?: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ContainerGetter = () => any
+/** Callback that runs an agent to completion — same signature as AgentPort.runAgentToCompletion */
+export type RunToCompletionFn = (input: RunAgentInput) => Promise<{
+  text: string
+  object?: unknown
+  totalTokens: number
+  inputTokens: number
+  outputTokens: number
+  costUsd: string
+}>
 
 export function createDelegateAgentTool(
-  getContainerFn: ContainerGetter,
+  runToCompletion: RunToCompletionFn,
+  auditStore: AuditStorePort,
   delegationContext?: Partial<DelegateAgentContext>,
   bakedAgentId?: string,
 ): AgentToolDefinition {
@@ -51,8 +61,7 @@ export function createDelegateAgentTool(
         return `Circular delegation detected: ${chainStr}`
       }
 
-      const container = getContainerFn()
-      const result = await container.agentUseCase.runAgentToCompletion({
+      const result = await runToCompletion({
         agentId,
         messages: [{ id: randomUUID(), role: 'user', content: inputText, createdAt: new Date() }],
         parentExecutionId,
@@ -70,7 +79,7 @@ export function createDelegateAgentTool(
 
       // The parent agentId is the last in the chain before agentId
       const parentAgentId = chain[chain.length - 1] ?? null
-      void container.auditStore.record({
+      void auditStore.record({
         userId: 'system',
         eventType: 'agent_delegation',
         metadata: { parentAgentId, childAgentId: agentId, depth: depth + 1 },

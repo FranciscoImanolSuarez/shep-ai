@@ -6,14 +6,34 @@ import type { AgentStorePort } from '@/core/ports/out/agent-store.port'
 import type { AgentExecutionStorePort } from '@/core/ports/out/agent-execution-store.port'
 import type { TracerPort } from '@/core/ports/out/tracer.port'
 import type { ToolRegistry } from '@/core/tools/tool-registry'
-import type { AgentRunnerAdapter } from '@/adapters/ai/agent-runner.adapter'
+import type { AgentRunnerPort } from '@/core/ports/out/agent-runner.port'
+import type { RagPort } from '@/core/ports/in/rag.port'
+import type { McpServerStorePort } from '@/core/ports/out/mcp-server-store.port'
+import type { McpBundleLoaderPort } from '@/core/ports/out/mcp-bundle-loader.port'
+import type { AuditStorePort } from '@/core/ports/out/audit-store.port'
 import { DEFAULT_AGENT_CONFIG as defaultConfig } from '@/core/domain/entities/agent'
 import type { AgentToolDefinition } from '@/core/domain/entities/agent-tool'
 import { createDelegateAgentTool, createRagSearchTool } from '@/core/tools/builtin'
 import { computeCost } from '@/core/domain/entities/audit-event'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ContainerGetter = () => any
+// ---------------------------------------------------------------------------
+// Typed context bag — replaces Record<string, unknown> with `as string` casts
+// ---------------------------------------------------------------------------
+
+export interface AgentRunContext {
+  /** Existing trace id — if set, this run attaches to the trace as a child span */
+  __traceId?: string
+  /** Parent span to attach the agent span under */
+  __parentSpanId?: string
+  /** Workspace that owns this run — required for tracing and MCP lookup */
+  workspaceId?: string
+  /** User triggering the run — used for audit recording */
+  userId?: string
+  /** Current delegation depth (set by delegate-agent tool) */
+  __delegationDepth?: number
+  /** Delegation chain accumulated so far */
+  __delegationChain?: string[]
+}
 
 // ---------------------------------------------------------------------------
 // Exported pure helpers — extracted for testability (no behaviour change)
@@ -56,8 +76,17 @@ export function buildMemorySnippet(executions: AgentExecution[]): string {
     s.length <= max ? s : s.slice(0, max) + '…'
 
   const entries = completed.slice(0, 5).map((exec, i) => {
-    const firstUserMsg = exec.input.find((m) => m.role === 'user')?.content ?? ''
-    const userSnippet = truncate(String(firstUserMsg), 160)
+    const rawContent = exec.input.find((m) => m.role === 'user')?.content ?? ''
+    const textContent =
+      typeof rawContent === 'string'
+        ? rawContent
+        : Array.isArray(rawContent)
+          ? (rawContent as Array<{ type?: string; text?: string }>)
+              .filter((p) => p.type === 'text' && typeof p.text === 'string')
+              .map((p) => p.text)
+              .join('')
+          : ''
+    const userSnippet = truncate(textContent, 160)
     const resultSnippet = truncate(exec.result ?? '', 240)
     return `#${i + 1} (${formatTime(exec.createdAt)})\n  user: ${userSnippet}\n  you: ${resultSnippet}`
   })
@@ -78,11 +107,55 @@ export class AgentUseCase implements AgentPort {
     private readonly agentStore: AgentStorePort,
     private readonly executionStore: AgentExecutionStorePort,
     private readonly toolRegistry: ToolRegistry,
-    private readonly agentRunner: AgentRunnerAdapter,
-    private readonly getContainerFn?: ContainerGetter,
+    private readonly agentRunner: AgentRunnerPort,
+    private readonly ragPort: RagPort,
+    private readonly mcpServerStore: McpServerStorePort,
+    private readonly mcpBundleLoader: McpBundleLoaderPort,
+    private readonly auditStore: AuditStorePort,
     // T1.10: optional tracer — if absent, no spans are emitted
     private readonly tracer?: TracerPort,
   ) {}
+
+  // ---------------------------------------------------------------------------
+  // D4: extracted trace-setup — shared by runAgent and runAgentToCompletion
+  // ---------------------------------------------------------------------------
+
+  private async resolveTraceSetup(
+    agent: Agent,
+    ctx: AgentRunContext,
+  ): Promise<{ traceCtx: Awaited<ReturnType<TracerPort['startTrace']>> | undefined; agentSpanId: string | undefined; isTraceOwner: boolean }> {
+    const { workspaceId, __traceId: incomingTraceId, __parentSpanId: incomingParentSpanId } = ctx
+
+    if (!this.tracer || !workspaceId) {
+      return { traceCtx: undefined, agentSpanId: undefined, isTraceOwner: false }
+    }
+
+    let traceCtx: Awaited<ReturnType<TracerPort['startTrace']>>
+    let isTraceOwner = false
+
+    if (!incomingTraceId) {
+      // This call owns the trace — start a new one
+      traceCtx = await this.tracer.startTrace({
+        workspaceId,
+        rootKind: 'agent',
+        attributes: { 'agent.id': agent.id, 'agent.name': agent.name },
+      })
+      isTraceOwner = true
+    } else {
+      // Attach to an existing trace as a child span
+      traceCtx = { traceId: incomingTraceId, workspaceId }
+      isTraceOwner = false
+    }
+
+    const { spanId: agentSpanId } = this.tracer.startSpan(traceCtx, {
+      name: `agent.${agent.name}`,
+      kind: 'agent',
+      parentSpanId: incomingParentSpanId,
+      attributes: { 'agent.id': agent.id },
+    })
+
+    return { traceCtx, agentSpanId, isTraceOwner }
+  }
 
   /**
    * P0.3 — Now async. MCP tools live behind a network call and require lifecycle
@@ -100,9 +173,8 @@ export class AgentUseCase implements AgentPort {
 
     // When the agent has a knowledgeBaseId, override the rag-search tool with a KB-scoped version
     let regularTools = this.toolRegistry.getByIds(regularIds)
-    if (agent.knowledgeBaseId && regularIds.includes('rag-search') && this.getContainerFn) {
-      const { ragUseCase } = this.getContainerFn()
-      const scopedRagTool = createRagSearchTool(ragUseCase, agent.knowledgeBaseId) as AgentToolDefinition
+    if (agent.knowledgeBaseId && regularIds.includes('rag-search')) {
+      const scopedRagTool = createRagSearchTool(this.ragPort, agent.knowledgeBaseId) as AgentToolDefinition
       regularTools = regularTools.map((t) => t.id === 'rag-search' ? scopedRagTool : t)
     }
 
@@ -111,27 +183,21 @@ export class AgentUseCase implements AgentPort {
     // and skipped so one broken server does not break the whole agent run.
     const mcpTools: AgentToolDefinition[] = []
     const mcpCleanups: Array<() => Promise<void>> = []
-    if (mcpServerIds.length > 0 && this.getContainerFn && traceContext?.workspaceId) {
-      const { mcpServerStore } = this.getContainerFn() as {
-        mcpServerStore?: { findEnabledByIds(ids: string[], workspaceId: string): Promise<Array<{ id: string; transportType: 'http' | 'sse'; url: string; authToken?: string | null; workspaceId: string; name: string; enabled: boolean; createdAt: Date; updatedAt: Date }>> }
-      }
-      if (mcpServerStore) {
-        const servers = await mcpServerStore.findEnabledByIds(mcpServerIds, traceContext.workspaceId)
-        const { loadMcpBundle } = await import('@/adapters/mcp/mcp-client.adapter')
-        const bundles = await Promise.allSettled(servers.map((s) => loadMcpBundle(s)))
-        for (const bundle of bundles) {
-          if (bundle.status === 'fulfilled') {
-            mcpTools.push(...bundle.value.tools)
-            mcpCleanups.push(bundle.value.close)
-          } else {
-            console.error('mcp server load failed', bundle.reason)
-          }
+    if (mcpServerIds.length > 0 && traceContext?.workspaceId) {
+      const servers = await this.mcpServerStore.findEnabledByIds(mcpServerIds, traceContext.workspaceId)
+      const bundles = await Promise.allSettled(servers.map((s) => this.mcpBundleLoader.loadBundle(s)))
+      for (const bundle of bundles) {
+        if (bundle.status === 'fulfilled') {
+          mcpTools.push(...bundle.value.tools)
+          mcpCleanups.push(bundle.value.close)
+        } else {
+          console.error('mcp server load failed', bundle.reason)
         }
       }
     }
 
     const agentTools: AgentToolDefinition[] = []
-    if (agentIds.length > 0 && this.getContainerFn) {
+    if (agentIds.length > 0) {
       const depth = delegationContext?.depth ?? 0
       const chain = delegationContext?.chain ?? []
       const maxDepth = agent.config.maxDelegationDepth
@@ -141,7 +207,8 @@ export class AgentUseCase implements AgentPort {
       for (const toolId of agentIds) {
         const delegatedAgentId = toolId.slice('agent:'.length)
         agentTools.push(createDelegateAgentTool(
-          this.getContainerFn!,
+          (input) => this.runAgentToCompletion(input),
+          this.auditStore,
           {
             __delegationDepth: depth,
             __delegationChain: chainWithCurrent,
@@ -262,39 +329,12 @@ export class AgentUseCase implements AgentPort {
       delegationFields.__parentExecutionId = input.parentExecutionId
     }
 
-    // T1.10: resolve trace context from incoming context
-    const incomingTraceId = input.context?.__traceId as string | undefined
-    const incomingParentSpanId = input.context?.__parentSpanId as string | undefined
-    const workspaceId = input.context?.workspaceId as string | undefined
+    // D5: typed context access
+    const ctx: AgentRunContext = (input.context ?? {}) as AgentRunContext
+    const workspaceId = ctx.workspaceId
 
-    let traceCtx: Awaited<ReturnType<TracerPort['startTrace']>> | undefined
-    let agentSpanId: string | undefined
-    let isTraceOwner = false
-
-    if (this.tracer && workspaceId) {
-      if (!incomingTraceId) {
-        // This call owns the trace — start a new one
-        traceCtx = await this.tracer.startTrace({
-          workspaceId,
-          rootKind: 'agent',
-          attributes: { 'agent.id': agent.id, 'agent.name': agent.name },
-        })
-        isTraceOwner = true
-      } else {
-        // Attach to an existing trace as a child span
-        traceCtx = { traceId: incomingTraceId, workspaceId }
-        isTraceOwner = false
-      }
-
-      // Start the agent span
-      const { spanId } = this.tracer.startSpan(traceCtx, {
-        name: `agent.${agent.name}`,
-        kind: 'agent',
-        parentSpanId: incomingParentSpanId,
-        attributes: { 'agent.id': agent.id },
-      })
-      agentSpanId = spanId
-    }
+    // D4: extracted trace setup
+    const { traceCtx, agentSpanId, isTraceOwner } = await this.resolveTraceSetup(agent, ctx)
 
     // T1.12 + P0.3: Resolve tools AFTER trace context so delegation tools get
     // trace info. Now async because MCP tools require opening clients.
@@ -423,38 +463,13 @@ export class AgentUseCase implements AgentPort {
     // P1.2: optionally inject recent execution history into the system prompt
     const agent = await this.withMemory(this.applyOverrides(baseAgent, input.configOverrides))
 
-    // T1.10: resolve trace context from incoming context
-    const incomingTraceId = input.context?.__traceId as string | undefined
-    const incomingParentSpanId = input.context?.__parentSpanId as string | undefined
-    const workspaceId = input.context?.workspaceId as string | undefined
+    // D5: typed context access
+    const ctx: AgentRunContext = (input.context ?? {}) as AgentRunContext
+    const workspaceId = ctx.workspaceId
+    const userId = ctx.userId
 
-    let traceCtx: Awaited<ReturnType<TracerPort['startTrace']>> | undefined
-    let agentSpanId: string | undefined
-    let isTraceOwner = false
-
-    if (this.tracer && workspaceId) {
-      if (!incomingTraceId) {
-        // This call owns the trace — start a new one
-        traceCtx = await this.tracer.startTrace({
-          workspaceId,
-          rootKind: 'agent',
-          attributes: { 'agent.id': agent.id, 'agent.name': agent.name },
-        })
-        isTraceOwner = true
-      } else {
-        // Attach to existing trace as a child span
-        traceCtx = { traceId: incomingTraceId, workspaceId }
-        isTraceOwner = false
-      }
-
-      const { spanId } = this.tracer.startSpan(traceCtx, {
-        name: `agent.${agent.name}`,
-        kind: 'agent',
-        parentSpanId: incomingParentSpanId,
-        attributes: { 'agent.id': agent.id },
-      })
-      agentSpanId = spanId
-    }
+    // D4: extracted trace setup
+    const { traceCtx, agentSpanId, isTraceOwner } = await this.resolveTraceSetup(agent, ctx)
 
     // T1.12 + P0.3: Resolve tools AFTER trace context so delegation tools get
     // trace info. Async because MCP tools open clients we must close after run.
@@ -511,15 +526,17 @@ export class AgentUseCase implements AgentPort {
         completedAt: new Date(),
       })
 
-      const userId = input.context?.userId as string | undefined
-      if (userId && this.getContainerFn) {
-        const { auditStore } = this.getContainerFn()
-        void auditStore.record({
+      // D6: compute cost once, reuse for audit and return value
+      const rawCost = computeCost(agent.model, result.totalTokens)
+      const costUsd = rawCost !== undefined ? rawCost.toFixed(6) : '0'
+
+      if (userId) {
+        void this.auditStore.record({
           userId,
           eventType: 'agent_run',
           metadata: { agentId: agent.id, executionId, steps: result.steps.length },
           tokenCount: result.totalTokens,
-          costUsd: computeCost(agent.model, result.totalTokens),
+          costUsd: rawCost,
         }).catch((err: unknown) => console.error('audit failed', err))
       }
 
@@ -534,10 +551,6 @@ export class AgentUseCase implements AgentPort {
           await this.tracer.finishTrace(traceCtx, { status: 'ok' })
         }
       }
-
-      // Compute costUsd as a decimal string (using blended pricing constants)
-      const rawCost = computeCost(agent.model, result.totalTokens)
-      const costUsd = rawCost !== undefined ? rawCost.toFixed(6) : '0'
 
       return {
         text: result.text,

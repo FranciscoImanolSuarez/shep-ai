@@ -1,4 +1,5 @@
 import type { VectorSearchResult } from '@/core/ports/out/vector-store.port'
+import type { RerankerPort } from '@/core/ports/out/reranker.port'
 
 /**
  * P1.5 — Cross-encoder reranking via Cohere `rerank-v3.5`.
@@ -56,5 +57,19 @@ export async function rerankChunks(
   } catch (err) {
     console.error('cohere rerank failed, falling back to ANN order', err)
     return candidates.slice(0, topN)
+  }
+}
+
+/**
+ * Adapter class wrapping `rerankChunks` to satisfy `RerankerPort`.
+ * Inject this when `COHERE_API_KEY` is set; use `PassthroughReranker` otherwise.
+ */
+export class CohereRerankerAdapter implements RerankerPort {
+  async rerank(
+    query: string,
+    candidates: VectorSearchResult[],
+    topK: number,
+  ): Promise<VectorSearchResult[]> {
+    return rerankChunks(query, candidates, topK)
   }
 }
