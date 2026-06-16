@@ -151,7 +151,12 @@ export default function KnowledgeBasesPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return
-    await fetch(`/api/knowledge-bases/${deleteTarget.id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/knowledge-bases/${deleteTarget.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error('Failed to delete knowledge base')
+      setDeleteTarget(null)
+      return
+    }
     setDeleteTarget(null)
     setKbs((prev) => prev.filter((k) => k.id !== deleteTarget.id))
     toast.success('Knowledge base deleted')

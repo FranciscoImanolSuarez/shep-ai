@@ -342,7 +342,11 @@ export default function SchedulesPage() {
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/scheduled-agents/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/scheduled-agents/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error('Failed to delete schedule')
+      return
+    }
     setSchedules((prev) => prev.filter((s) => s.id !== id))
     toast.success('Schedule deleted')
   }

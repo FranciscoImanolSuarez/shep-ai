@@ -22,6 +22,7 @@ import { PageBody } from '@/components/shared/PageHeader'
 import { StatCard } from '@/components/shared/StatCard'
 import { SectionDivider } from '@/components/shared/SectionDivider'
 import type { Trace, TraceStatus } from '@/core/domain/entities/trace'
+import { formatDurationMs } from '@/lib/format'
 
 async function getDashboardData(userId: string) {
   const ctx = await getActiveWorkspaceContext()
@@ -101,12 +102,6 @@ function getGreeting(): string {
   if (hour < 12) return 'Good morning'
   if (hour < 18) return 'Good afternoon'
   return 'Good evening'
-}
-
-function formatDuration(ms?: number): string {
-  if (ms === undefined) return '—'
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(2)}s`
 }
 
 function TraceStatusBadge({ status }: { status: TraceStatus }) {
@@ -392,7 +387,7 @@ export default async function DashboardPage() {
                     </Badge>
                     <TraceStatusBadge status={trace.status} />
                     <span className="text-xs text-muted-foreground ml-auto shrink-0 font-mono">
-                      {formatDuration(trace.durationMs)} · {relativeTime(trace.startedAt)}
+                      {formatDurationMs(trace.durationMs)} · {relativeTime(trace.startedAt)}
                     </span>
                   </Link>
                 ))}

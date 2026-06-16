@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ChevronDownIcon, ChevronRightIcon, CheckCircleIcon, AlertCircleIcon } from 'lucide-react'
 import type { Span } from '@/core/domain/entities/span'
 import type { SpanKind } from '@/core/domain/entities/trace'
@@ -125,7 +125,7 @@ interface SpanTreeProps {
 
 export function SpanTree({ spans }: SpanTreeProps) {
   const [selectedSpan, setSelectedSpan] = useState<Span | null>(null)
-  const tree = buildTree(spans)
+  const tree = useMemo(() => buildTree(spans), [spans])
 
   return (
     <div className="flex h-full">

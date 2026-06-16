@@ -16,33 +16,7 @@ import type { Conversation } from '@/core/domain/entities/conversation'
 import { relativeTime } from '@/lib/relative-time'
 import { toast } from '@/components/shared/Toast'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-
-type Provider = 'openai' | 'anthropic' | 'ollama'
-function parseProvider(model?: string): { provider: Provider; name: string } | null {
-  if (!model) return null
-  if (model.includes('/')) {
-    const [p, ...rest] = model.split('/')
-    const lower = p.toLowerCase()
-    if (lower === 'openai' || lower === 'anthropic' || lower === 'ollama') {
-      return { provider: lower, name: rest.join('/') }
-    }
-  }
-  if (model.startsWith('gpt')) return { provider: 'openai', name: model }
-  if (model.startsWith('claude')) return { provider: 'anthropic', name: model }
-  if (model.startsWith('llama') || model.startsWith('mistral')) return { provider: 'ollama', name: model }
-  return null
-}
-
-const PROVIDER_BG: Record<Provider, string> = {
-  openai: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20',
-  anthropic: 'bg-orange-500/15 text-orange-600 border-orange-500/20',
-  ollama: 'bg-violet-500/15 text-violet-600 border-violet-500/20',
-}
-const PROVIDER_INITIAL: Record<Provider, string> = {
-  openai: 'O',
-  anthropic: 'A',
-  ollama: 'L',
-}
+import { parseProvider, PROVIDER_BG, PROVIDER_INITIAL } from '@/lib/model-provider'
 
 interface ConversationsGridProps {
   conversations: Conversation[]
@@ -82,7 +56,7 @@ function groupByDate(conversations: Conversation[]): DateGroup[] {
 // ──────────────────────────────────────────────────────────────
 
 function FeaturedHero({ conv }: { conv: Conversation }) {
-  const parsed = parseProvider(conv.model)
+  const parsed = parseProvider(conv.model, { strict: true })
   return (
     <Link
       href={`/chat/${conv.id}`}
@@ -151,7 +125,7 @@ interface RowProps {
 }
 
 function ConversationRow({ conv, onDelete, isDeleting }: RowProps) {
-  const parsed = parseProvider(conv.model)
+  const parsed = parseProvider(conv.model, { strict: true })
   return (
     <div
       className={`group relative flex items-center gap-4 px-3 sm:px-5 py-3 hover:bg-muted/40 transition-colors ${

@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from '@/components/shared/Toast'
 
 interface KnowledgeBase {
   id: string
@@ -37,7 +38,9 @@ export function KnowledgeBaseSelector({
     fetch('/api/knowledge-bases')
       .then((r) => r.json())
       .then((d) => setKnowledgeBases(d.knowledgeBases ?? []))
-      .catch(() => {})
+      .catch(() => {
+        toast.error('Failed to load knowledge bases')
+      })
   }, [])
 
   const selectValue = value === null && includeAll ? ALL_VALUE : (value ?? '')

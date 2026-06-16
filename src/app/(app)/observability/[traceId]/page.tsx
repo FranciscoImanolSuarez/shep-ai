@@ -4,14 +4,23 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { ActivityIcon, ChevronLeftIcon, ClockIcon, DollarSignIcon, HashIcon, ZapIcon } from 'lucide-react'
 import Link from 'next/link'
-import { TraceTimeline } from '@/components/observability/TraceTimeline'
-import { SpanTree } from '@/components/observability/SpanTree'
+import dynamic from 'next/dynamic'
 import type { Trace, TraceStatus } from '@/core/domain/entities/trace'
 import type { Span } from '@/core/domain/entities/span'
 import { Tabs } from '@/components/shared/Tabs'
 import { Badge } from '@/components/shared/Badge'
 import { StatCard } from '@/components/shared/StatCard'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { formatDurationMs, formatCost } from '@/lib/format'
+
+const TraceTimeline = dynamic(
+  () => import('@/components/observability/TraceTimeline').then((m) => m.TraceTimeline),
+  { ssr: false },
+)
+const SpanTree = dynamic(
+  () => import('@/components/observability/SpanTree').then((m) => m.SpanTree),
+  { ssr: false },
+)
 
 function StatusBadge({ status }: { status: TraceStatus }) {
   const variantMap: Record<TraceStatus, 'warning' | 'success' | 'danger'> = {
@@ -20,19 +29,6 @@ function StatusBadge({ status }: { status: TraceStatus }) {
     error: 'danger',
   }
   return <Badge variant={variantMap[status]}>{status}</Badge>
-}
-
-function formatDuration(ms?: number): string {
-  if (ms === undefined) return '—'
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(2)}s`
-}
-
-function formatCost(cost: string): string {
-  const num = parseFloat(cost)
-  if (num === 0) return '$0.00'
-  if (num < 0.01) return `$${num.toFixed(4)}`
-  return `$${num.toFixed(2)}`
 }
 
 type View = 'timeline' | 'tree'
@@ -146,7 +142,7 @@ export default function TraceDetailPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
           <StatCard
             label="Duration"
-            value={formatDuration(trace.durationMs)}
+            value={formatDurationMs(trace.durationMs)}
             icon={ClockIcon}
           />
           <StatCard

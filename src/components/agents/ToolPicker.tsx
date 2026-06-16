@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { SearchIcon, BotIcon, WrenchIcon, ServerIcon } from 'lucide-react'
 import { Spinner } from '@/components/shared/Spinner'
+import { toast } from '@/components/shared/Toast'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -134,7 +135,9 @@ export function ToolPicker({ value, onChange, currentAgentId }: ToolPickerProps)
       setMcpServers(toolsData.mcpServers ?? [])
       const all: AgentData[] = agentsData.agents ?? []
       setAgents(currentAgentId ? all.filter((a) => a.id !== currentAgentId) : all)
-    }).catch(() => {}).finally(() => {
+    }).catch(() => {
+      toast.error('Failed to load tool catalog')
+    }).finally(() => {
       if (!cancelled) setLoading(false)
     })
 

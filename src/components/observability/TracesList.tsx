@@ -7,19 +7,7 @@ import type { Trace, TraceStatus } from '@/core/domain/entities/trace'
 import { Badge } from '@/components/shared/Badge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { DateRangePicker } from '@/components/shared/forms/DateRangePicker'
-
-function formatDuration(ms?: number): string {
-  if (ms === undefined) return '—'
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(2)}s`
-}
-
-function formatCost(cost: string): string {
-  const num = parseFloat(cost)
-  if (num === 0) return '$0.00'
-  if (num < 0.01) return `$${num.toFixed(4)}`
-  return `$${num.toFixed(2)}`
-}
+import { formatDurationMs, formatCost } from '@/lib/format'
 
 function StatusBadge({ status }: { status: TraceStatus }) {
   const variantMap: Record<TraceStatus, 'warning' | 'success' | 'danger'> = {
@@ -195,7 +183,7 @@ export function TracesList() {
                     <StatusBadge status={trace.status} />
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">
-                    {formatDuration(trace.durationMs)}
+                    {formatDurationMs(trace.durationMs)}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">
                     {(trace.totalInputTokens + trace.totalOutputTokens).toLocaleString()}

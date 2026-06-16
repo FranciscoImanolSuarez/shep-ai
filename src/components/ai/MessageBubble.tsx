@@ -1,10 +1,11 @@
 'use client'
 
+import { memo } from 'react'
 import type { ReactNode } from 'react'
 import { CopyIcon, SparklesIcon } from 'lucide-react'
+import { parseProvider, PROVIDER_DOT } from '@/lib/model-provider'
 
 type Role = 'user' | 'assistant' | 'system'
-type Provider = 'openai' | 'anthropic' | 'ollama'
 
 interface MessageBubbleProps {
   role: Role
@@ -15,29 +16,7 @@ interface MessageBubbleProps {
   onCopy?: () => void
 }
 
-function parseModel(modelString?: string): { provider: Provider; name: string } | null {
-  if (!modelString) return null
-  if (modelString.includes('/')) {
-    const [provider, ...rest] = modelString.split('/')
-    const p = provider.toLowerCase()
-    if (p === 'openai' || p === 'anthropic' || p === 'ollama') {
-      return { provider: p, name: rest.join('/') }
-    }
-  }
-  // Fallback: try to detect by prefix
-  if (modelString.startsWith('gpt')) return { provider: 'openai', name: modelString }
-  if (modelString.startsWith('claude')) return { provider: 'anthropic', name: modelString }
-  if (modelString.startsWith('llama') || modelString.startsWith('mistral')) return { provider: 'ollama', name: modelString }
-  return { provider: 'openai', name: modelString }
-}
-
-const PROVIDER_DOT: Record<Provider, string> = {
-  openai: 'bg-emerald-500',
-  anthropic: 'bg-orange-500',
-  ollama: 'bg-violet-500',
-}
-
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   role,
   content,
   timestamp,
@@ -82,7 +61,7 @@ export function MessageBubble({
   }
 
   // assistant — left-aligned bubble with avatar, mirroring the user side
-  const parsed = parseModel(model)
+  const parsed = parseProvider(model)
   return (
     <div className="flex justify-start gap-3 my-5 group">
       <div className="size-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-1">
@@ -120,4 +99,4 @@ export function MessageBubble({
       </div>
     </div>
   )
-}
+})

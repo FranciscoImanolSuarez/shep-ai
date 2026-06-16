@@ -39,28 +39,7 @@ import {
   MicIcon,
 } from 'lucide-react'
 import { Spinner } from '@/components/shared/Spinner'
-
-// Provider parsing for floating model badge
-type Provider = 'openai' | 'anthropic' | 'ollama'
-function parseProvider(model?: string): { provider: Provider; name: string } | null {
-  if (!model) return null
-  if (model.includes('/')) {
-    const [p, ...rest] = model.split('/')
-    const lower = p.toLowerCase()
-    if (lower === 'openai' || lower === 'anthropic' || lower === 'ollama') {
-      return { provider: lower, name: rest.join('/') }
-    }
-  }
-  if (model.startsWith('gpt')) return { provider: 'openai', name: model }
-  if (model.startsWith('claude')) return { provider: 'anthropic', name: model }
-  if (model.startsWith('llama') || model.startsWith('mistral')) return { provider: 'ollama', name: model }
-  return { provider: 'openai', name: model }
-}
-const PROVIDER_DOT: Record<Provider, string> = {
-  openai: 'bg-emerald-500',
-  anthropic: 'bg-orange-500',
-  ollama: 'bg-violet-500',
-}
+import { parseProvider, PROVIDER_DOT } from '@/lib/model-provider'
 
 // ---------------------------------------------------------------------------
 // Helpers
