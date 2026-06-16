@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
-import { createDb } from '@/adapters/db/connection'
-import { documents } from '@/adapters/db/schema'
 
 const syncSchema = z.object({
   documentId: z.string().min(1),
@@ -28,13 +25,10 @@ export async function POST(req: Request) {
 
   const { documentId } = parsed.data
 
+  const { ragUseCase, fileSource } = getContainer()
+
   // Look up the existing document to get the Drive file ID
-  const db = createDb()
-  const [doc] = await db
-    .select({ metadata: documents.metadata, knowledgeBaseId: documents.knowledgeBaseId })
-    .from(documents)
-    .where(eq(documents.id, documentId))
-    .limit(1)
+  const doc = await ragUseCase.getDocument(documentId)
 
   if (!doc) {
     return NextResponse.json(
@@ -58,8 +52,6 @@ export async function POST(req: Request) {
       { status: 400 },
     )
   }
-
-  const { ragUseCase, fileSource } = getContainer()
 
   try {
     // Delete old document and re-ingest

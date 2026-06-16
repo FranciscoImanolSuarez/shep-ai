@@ -1,7 +1,4 @@
 import { streamText, type UIMessage } from 'ai'
-import { openai } from '@ai-sdk/openai'
-import { anthropic } from '@ai-sdk/anthropic'
-import { createOpenAI } from '@ai-sdk/openai'
 import { getEnv } from '@/config/env'
 import { getContainer } from '@/config/container'
 import { auth } from '@/lib/auth'
@@ -13,6 +10,8 @@ import {
   type ProviderId,
 } from '@/config/models'
 import type { Env } from '@/config/env'
+import { getProviderModel } from '@/adapters/ai/model-factory'
+import { extractTextFromParts } from '@/lib/ui-message'
 
 /**
  * Resolves the effective provider for a given model id.
@@ -24,22 +23,7 @@ function resolveProviderForModel(modelId: string, envProvider: ProviderId): Prov
 }
 
 function buildProviderModel(provider: ProviderId, modelId: string) {
-  switch (provider) {
-    case 'anthropic':
-      return anthropic(modelId)
-    case 'ollama': {
-      const ollama = createOpenAI({
-        baseURL: process.env.OLLAMA_BASE_URL
-          ? `${process.env.OLLAMA_BASE_URL}/v1`
-          : 'http://localhost:11434/v1',
-        apiKey: 'ollama',
-      })
-      return ollama(modelId)
-    }
-    case 'openai':
-    default:
-      return openai(modelId)
-  }
+  return getProviderModel(provider, modelId)
 }
 
 /**
@@ -92,10 +76,7 @@ function resolveModel(
 function toModelMessages(messages: UIMessage[]) {
   return messages.map((m) => ({
     role: m.role as 'user' | 'assistant' | 'system',
-    content: m.parts
-      ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-      .map((p) => p.text)
-      .join('') ?? (m as unknown as { content?: string }).content ?? '',
+    content: extractTextFromParts(m.parts ?? []) || (m as unknown as { content?: string }).content || '',
   }))
 }
 
@@ -173,10 +154,7 @@ export async function POST(req: Request) {
       .find((m: UIMessage) => m.role === 'user')
 
     if (lastUserMsg) {
-      const query = lastUserMsg.parts
-        ?.filter((p: { type: string }) => p.type === 'text')
-        .map((p: { text: string }) => p.text)
-        .join('') ?? ''
+      const query = extractTextFromParts(lastUserMsg.parts ?? [])
 
       if (query) {
         const container = getContainer()

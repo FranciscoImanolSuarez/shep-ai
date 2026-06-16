@@ -1,12 +1,11 @@
 import { streamText } from 'ai'
-import { openai } from '@ai-sdk/openai'
-import { anthropic } from '@ai-sdk/anthropic'
-import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
 import type { UIMessage } from 'ai'
 import { auth } from '@/lib/auth'
 import { getEnv } from '@/config/env'
 import { getContainer } from '@/config/container'
+import { extractTextFromParts } from '@/lib/ui-message'
+import { getProviderModel } from '@/adapters/ai/model-factory'
 
 const messagePartSchema = z.union([
   z.object({ type: z.string(), text: z.string().optional() }),
@@ -25,32 +24,6 @@ const messageSchema = z.object({
 const chatSchema = z.object({
   messages: z.array(messageSchema).min(1),
 })
-
-function getModel(provider: string, model: string) {
-  switch (provider) {
-    case 'anthropic':
-      return anthropic(model || 'claude-sonnet-4-20250514')
-    case 'ollama': {
-      const ollama = createOpenAI({
-        baseURL: process.env.OLLAMA_BASE_URL
-          ? `${process.env.OLLAMA_BASE_URL}/v1`
-          : 'http://localhost:11434/v1',
-        apiKey: 'ollama',
-      })
-      return ollama(model || 'llama3.1')
-    }
-    case 'openai':
-    default:
-      return openai(model || 'gpt-4o')
-  }
-}
-
-function getTextFromUIMessage(m: UIMessage): string {
-  return m.parts
-    ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('') ?? ''
-}
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -79,28 +52,23 @@ export async function POST(req: Request) {
     .reverse()
     .find((m) => m.role === 'user') as UIMessage | undefined
 
-  const query = lastUserMessage ? getTextFromUIMessage(lastUserMessage) : ''
+  const query = lastUserMessage ? extractTextFromParts(lastUserMessage.parts ?? []) : ''
 
-  // Retrieve relevant context from documents
-  const [queryEmbedding] = await getContainer().aiProvider.generateEmbeddings({
-    model: env.AI_PROVIDER === 'ollama' ? 'nomic-embed-text' : 'text-embedding-3-small',
-    texts: [query],
-    dimensions: 768,
-  })
+  // Retrieve relevant context via the use case (embed + search + rerank)
+  const { ragUseCase } = getContainer()
+  const chunks = await ragUseCase.retrieve({ query, topK: 5 })
 
-  const results = await getContainer().vectorStore.search(queryEmbedding, 5)
-
-  const context = results
-    .map((r) => r.chunk.content)
+  const context = chunks
+    .map((c) => c.content)
     .join('\n\n---\n\n')
 
   // Convert messages to model messages
   const modelMessages = messages.map((m) => ({
     role: m.role as 'user' | 'assistant' | 'system',
-    content: getTextFromUIMessage(m as UIMessage),
+    content: extractTextFromParts((m as UIMessage).parts ?? []),
   }))
 
-  const aiModel = getModel(env.AI_PROVIDER, '')
+  const aiModel = getProviderModel(env.AI_PROVIDER, '')
 
   const result = streamText({
     model: aiModel,

@@ -1,39 +1,9 @@
-import { streamText, generateText, tool, stepCountIs, Output, wrapLanguageModel } from 'ai'
-import type { LanguageModel, ToolSet, ModelMessage, StopCondition, PrepareStepFunction, LanguageModelMiddleware } from 'ai'
+import { streamText, generateText, tool, stepCountIs, Output } from 'ai'
+import type { LanguageModel, ToolSet, ModelMessage, StopCondition, PrepareStepFunction } from 'ai'
 import type { z } from 'zod'
-
-// P2.4: load the devtools middleware once at module init when in dev mode.
-// Resolved eagerly so Next.js bundler sees the static import shape; gated by
-// NODE_ENV so production builds do not include it in the cold path.
-let _devMiddleware: LanguageModelMiddleware | undefined
-if (process.env.NODE_ENV === 'development') {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('@ai-sdk/devtools') as typeof import('@ai-sdk/devtools')
-    _devMiddleware = mod.devToolsMiddleware()
-  } catch (err) {
-    console.warn('[agent-runner] devToolsMiddleware unavailable, continuing without it', err)
-  }
-}
-
-// P2.1: Braintrust eval/observability — env-gated. Logs every LLM call to the
-// configured Braintrust project so traces show up in their dashboard with token
-// counts, latency, and full prompt/response. Identity function when no API key
-// is set so production with no Braintrust is a hard no-op.
-let _btWrap: <T extends object>(model: T) => T = (m) => m
-if (process.env.BRAINTRUST_API_KEY) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const bt = require('braintrust') as typeof import('braintrust')
-    bt.initLogger({ projectName: process.env.BRAINTRUST_PROJECT ?? 'shep-ai' })
-    _btWrap = bt.wrapAISDKModel
-  } catch (err) {
-    console.warn('[agent-runner] Braintrust unavailable, continuing without it', err)
-  }
-}
-import { openai } from '@ai-sdk/openai'
+import { getObservedModel } from '@/adapters/ai/model-factory'
 import { anthropic } from '@ai-sdk/anthropic'
-import { createOpenAI } from '@ai-sdk/openai'
+import { openai } from '@ai-sdk/openai'
 import type { Agent, AgentProvider } from '@/core/domain/entities/agent'
 import type { AgentToolDefinition } from '@/core/domain/entities/agent-tool'
 import type { AgentStep, AgentToolCall } from '@/core/domain/entities/agent-execution'
@@ -133,34 +103,9 @@ export interface AgentRuntimeContext {
 }
 
 function getModel(modelId: string, provider: Agent['provider']): LanguageModel {
-  let model: LanguageModel
-  switch (provider) {
-    case 'anthropic':
-      model = anthropic(modelId)
-      break
-    case 'ollama': {
-      const ollama = createOpenAI({
-        baseURL: process.env.OLLAMA_BASE_URL
-          ? `${process.env.OLLAMA_BASE_URL}/v1`
-          : 'http://localhost:11434/v1',
-        apiKey: 'ollama',
-      })
-      model = ollama(modelId)
-      break
-    }
-    case 'openai':
-    default:
-      model = openai(modelId)
-  }
-
-  // P2.1: wrap with Braintrust first so dev-tools sees the wrapped model and
-  // shows Braintrust spans inline. No-op when BRAINTRUST_API_KEY is unset.
-  const observed = _btWrap(model)
-  // P2.4: wrap with devtools middleware in dev so calls show up at
-  // http://localhost:4983. Production runs hit the raw (or Braintrust-wrapped) model.
-  return _devMiddleware
-    ? wrapLanguageModel({ model: observed, middleware: _devMiddleware })
-    : observed
+  // P2.1 + P2.4: delegate to the canonical factory which applies Braintrust
+  // observability and @ai-sdk/devtools middleware (env-gated).
+  return getObservedModel(provider, modelId)
 }
 
 const providerToolResolvers: Record<string, (provider: AgentProvider) => ToolSet[string] | null> = {

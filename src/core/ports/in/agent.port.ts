@@ -73,4 +73,5 @@ export interface AgentPort {
   }>
   getExecution(id: string): Promise<AgentExecution | null>
   getExecutions(agentId: string, limit?: number): Promise<AgentExecution[]>
+  getChildExecutions(parentExecutionId: string): Promise<AgentExecution[]>
 }

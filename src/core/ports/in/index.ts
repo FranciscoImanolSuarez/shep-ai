@@ -1,5 +1,5 @@
 export type { ChatPort, ChatInput } from './chat.port'
-export type { RagPort, IngestInput, QueryInput, RagQueryResult } from './rag.port'
+export type { RagPort, IngestInput, QueryInput, RagQueryResult, ListedDocument, RetrievedChunk } from './rag.port'
 export type { AgentPort, RunAgentInput, CreateAgentInput, UpdateAgentInput } from './agent.port'
 export type { ScheduledAgentPort, CreateScheduleInput, UpdateScheduleInput, RunScheduleResult } from './scheduled-agent.port'
 export type { MarketplacePort, PublishInput, BrowseFilters, InstallInput, PushUpdateInput, RateInput, UnpublishInput } from './marketplace.port'

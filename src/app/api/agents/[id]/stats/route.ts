@@ -12,9 +12,9 @@ export async function GET(
   }
 
   const { id } = await params
-  const { executionStore } = getContainer()
+  const { agentUseCase } = getContainer()
 
-  const executions = await executionStore.findByAgentId(id, 50)
+  const executions = await agentUseCase.getExecutions(id, 50)
 
   const totalRuns = executions.length
   const lastRunAt = executions[0]?.createdAt ?? null

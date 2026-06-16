@@ -12,8 +12,8 @@ export async function GET(
   }
 
   const { execId } = await params
-  const { executionStore } = getContainer()
+  const { agentUseCase } = getContainer()
 
-  const executions = await executionStore.findByParentId(execId)
+  const executions = await agentUseCase.getChildExecutions(execId)
   return NextResponse.json({ executions })
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import type { Document, DocumentChunk } from '@/core/domain/entities/document'
-import type { IngestInput, QueryInput, RagPort, RagQueryResult } from '@/core/ports/in/rag.port'
+import type { IngestInput, QueryInput, RagPort, RagQueryResult, ListedDocument, RetrievedChunk } from '@/core/ports/in/rag.port'
 import type { AIProviderPort } from '@/core/ports/out/ai-provider.port'
 import type { VectorStorePort } from '@/core/ports/out/vector-store.port'
 import type { RerankerPort } from '@/core/ports/out/reranker.port'
@@ -93,6 +93,39 @@ export class RagUseCase implements RagPort {
 
   async deleteDocument(documentId: string): Promise<void> {
     await this.vectorStore.deleteByDocumentId(documentId)
+  }
+
+  async listDocuments(): Promise<ListedDocument[]> {
+    return this.vectorStore.listDocuments()
+  }
+
+  async getDocument(id: string): Promise<ListedDocument | null> {
+    return this.vectorStore.getDocumentById(id)
+  }
+
+  async retrieve(input: QueryInput): Promise<RetrievedChunk[]> {
+    const [queryEmbedding] = await this.aiProvider.generateEmbeddings({
+      model: this.config.embeddingModel,
+      texts: [input.query],
+      dimensions: this.config.embeddingDimensions,
+    })
+
+    const topK = input.topK ?? 5
+    const overfetchK = Math.min(topK * 3, 30)
+
+    const candidates = await this.vectorStore.search(
+      queryEmbedding,
+      overfetchK,
+      input.filter,
+      input.knowledgeBaseId,
+    )
+
+    const results = await this.reranker.rerank(input.query, candidates, topK)
+
+    return results.map((r) => ({
+      content: r.chunk.content,
+      metadata: r.chunk.metadata,
+    }))
   }
 
   private chunkText(text: string, chunkSize: number, overlap: number): string[] {

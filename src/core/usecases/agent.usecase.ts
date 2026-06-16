@@ -595,4 +595,8 @@ export class AgentUseCase implements AgentPort {
   async getExecutions(agentId: string, limit?: number): Promise<AgentExecution[]> {
     return this.executionStore.findByAgentId(agentId, limit)
   }
+
+  async getChildExecutions(parentExecutionId: string): Promise<AgentExecution[]> {
+    return this.executionStore.findByParentId(parentExecutionId)
+  }
 }

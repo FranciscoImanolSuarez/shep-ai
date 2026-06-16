@@ -40,6 +40,7 @@ import {
 } from 'lucide-react'
 import { Spinner } from '@/components/shared/Spinner'
 import { parseProvider, PROVIDER_DOT } from '@/lib/model-provider'
+import { extractTextFromParts } from '@/lib/ui-message'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -90,10 +91,7 @@ async function patchConversationModel(conversationId: string, model: string): Pr
 }
 
 function getTextFromParts(parts: UIMessage['parts']): string {
-  return parts
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('')
+  return extractTextFromParts(parts as Array<{ type: string; text?: string }>)
 }
 
 const STARTERS = [

@@ -1,5 +1,5 @@
 import { eq, sql, desc } from 'drizzle-orm'
-import type { VectorStorePort, VectorSearchResult } from '@/core/ports/out/vector-store.port'
+import type { VectorStorePort, VectorSearchResult, StoredDocument } from '@/core/ports/out/vector-store.port'
 import type { Document, DocumentChunk } from '@/core/domain/entities/document'
 import { documents, documentChunks } from './schema'
 import type { Database } from './connection'
@@ -69,5 +69,49 @@ export class PgVectorAdapter implements VectorStorePort {
   async deleteByDocumentId(documentId: string): Promise<void> {
     await this.db.delete(documentChunks).where(eq(documentChunks.documentId, documentId))
     await this.db.delete(documents).where(eq(documents.id, documentId))
+  }
+
+  async listDocuments(): Promise<StoredDocument[]> {
+    const rows = await this.db
+      .select({
+        id: documents.id,
+        source: documents.source,
+        metadata: documents.metadata,
+        knowledgeBaseId: documents.knowledgeBaseId,
+        createdAt: documents.createdAt,
+      })
+      .from(documents)
+      .orderBy(desc(documents.createdAt))
+
+    return rows.map((r) => ({
+      id: r.id,
+      source: r.source,
+      metadata: (r.metadata as Record<string, unknown>) ?? {},
+      knowledgeBaseId: r.knowledgeBaseId ?? null,
+      createdAt: r.createdAt,
+    }))
+  }
+
+  async getDocumentById(id: string): Promise<StoredDocument | null> {
+    const [row] = await this.db
+      .select({
+        id: documents.id,
+        source: documents.source,
+        metadata: documents.metadata,
+        knowledgeBaseId: documents.knowledgeBaseId,
+        createdAt: documents.createdAt,
+      })
+      .from(documents)
+      .where(eq(documents.id, id))
+      .limit(1)
+
+    if (!row) return null
+    return {
+      id: row.id,
+      source: row.source,
+      metadata: (row.metadata as Record<string, unknown>) ?? {},
+      knowledgeBaseId: row.knowledgeBaseId ?? null,
+      createdAt: row.createdAt,
+    }
   }
 }
