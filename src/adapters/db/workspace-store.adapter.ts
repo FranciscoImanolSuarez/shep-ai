@@ -1,4 +1,4 @@
-import { eq, and, isNull } from 'drizzle-orm'
+import { eq, and, isNull, count } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import type { WorkspaceStorePort } from '@/core/ports/out/workspace-store.port'
 import type { Workspace, WorkspaceMember, WorkspaceInvitation, Role, WorkspaceWithRole } from '@/core/domain/entities/workspace'
@@ -167,12 +167,12 @@ export class WorkspaceStoreAdapter implements WorkspaceStorePort {
   }
 
   async countMembers(workspaceId: string): Promise<number> {
-    const rows = await this.db
-      .select({ id: workspaceMembers.id })
+    const [row] = await this.db
+      .select({ value: count() })
       .from(workspaceMembers)
       .where(eq(workspaceMembers.workspaceId, workspaceId))
 
-    return rows.length
+    return row?.value ?? 0
   }
 
   async insertInvitation(invitation: Omit<WorkspaceInvitation, 'id' | 'createdAt' | 'acceptedAt'>): Promise<WorkspaceInvitation> {

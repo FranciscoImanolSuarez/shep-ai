@@ -7,7 +7,7 @@ import type { Database } from './connection'
 export class PgVectorAdapter implements VectorStorePort {
   constructor(private readonly db: Database) {}
 
-  async saveDocument(doc: Document & { knowledgeBaseId?: string }): Promise<void> {
+  async saveDocument(doc: Document & { content: string; knowledgeBaseId?: string }): Promise<void> {
     await this.db.insert(documents).values({
       id: doc.id,
       knowledgeBaseId: doc.knowledgeBaseId ?? null,

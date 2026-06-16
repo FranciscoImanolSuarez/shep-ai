@@ -12,28 +12,15 @@ export async function GET() {
   const userId = session.user.email
   const ctx = await getActiveWorkspaceContext()
 
-  const { agentUseCase, knowledgeBaseUseCase, knowledgeBaseStore, workflowUseCase } = getContainer()
+  const { agentUseCase, knowledgeBaseUseCase, workflowUseCase } = getContainer()
 
   const [agents, kbs] = await Promise.all([
-    agentUseCase.listAgents().catch(() => []),
+    agentUseCase.listAgents(ctx?.workspace.id).catch(() => []),
     knowledgeBaseUseCase.list(userId).catch(() => []),
   ])
 
-  // Count total documents across all knowledge bases
-  let docCount = 0
-  try {
-    const docCounts = await Promise.all(
-      kbs.map((kb) =>
-        knowledgeBaseStore
-          .listDocumentsByKb(kb.id)
-          .then((docs) => docs.length)
-          .catch(() => 0),
-      ),
-    )
-    docCount = docCounts.reduce((a, b) => a + b, 0)
-  } catch {
-    // non-fatal
-  }
+  // documentCount is already included in each KnowledgeBase via listByUser's count() join
+  const docCount = kbs.reduce((sum, kb) => sum + (kb.documentCount ?? 0), 0)
 
   // Count workflows if we have workspace context
   let workflowCount = 0

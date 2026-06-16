@@ -100,7 +100,6 @@ export class KnowledgeBaseStoreAdapter implements KnowledgeBaseStorePort {
     const rows = await this.db
       .select({
         id: documents.id,
-        content: documents.content,
         source: documents.source,
         metadata: documents.metadata,
         createdAt: documents.createdAt,
@@ -111,10 +110,27 @@ export class KnowledgeBaseStoreAdapter implements KnowledgeBaseStorePort {
 
     return rows.map((r) => ({
       id: r.id,
-      content: r.content,
       source: r.source,
       metadata: (r.metadata as Record<string, unknown>) ?? {},
       createdAt: r.createdAt,
     }))
+  }
+
+  async getDocumentContent(id: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ content: documents.content })
+      .from(documents)
+      .where(eq(documents.id, id))
+
+    return row?.content ?? null
+  }
+
+  async getTotalContentChars(knowledgeBaseId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ total: sql<number>`coalesce(sum(length(${documents.content})), 0)` })
+      .from(documents)
+      .where(eq(documents.knowledgeBaseId, knowledgeBaseId))
+
+    return Number(row?.total ?? 0)
   }
 }

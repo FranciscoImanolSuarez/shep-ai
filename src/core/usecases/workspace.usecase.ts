@@ -65,8 +65,11 @@ export class WorkspaceUseCase implements WorkspacePort {
   }
 
   async getWorkspace(userId: string, workspaceId: string): Promise<WorkspaceWithRole> {
-    const member = await this.assertMember(userId, workspaceId)
-    const ws = await this.store.findWorkspaceById(workspaceId)
+    const [member, ws] = await Promise.all([
+      this.store.getMember(workspaceId, userId),
+      this.store.findWorkspaceById(workspaceId),
+    ])
+    if (!member) throw new WorkspaceForbiddenError()
     if (!ws) throw new WorkspaceNotFoundError(workspaceId)
     return { ...ws, role: member.role as Role }
   }

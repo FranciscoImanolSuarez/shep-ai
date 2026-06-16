@@ -29,7 +29,6 @@ async function getDashboardData(userId: string) {
     conversationUseCase,
     agentUseCase,
     knowledgeBaseUseCase,
-    knowledgeBaseStore,
     workflowUseCase,
     auditStore,
     observabilityUseCase,
@@ -41,19 +40,12 @@ async function getDashboardData(userId: string) {
   const [conversationsAll, totalConvs, agents, kbs] = await Promise.all([
     conversationUseCase.listConversations(userId),
     conversationUseCase.countConversations(userId),
-    agentUseCase.listAgents().catch(() => []),
+    agentUseCase.listAgents(ctx?.workspace.id).catch(() => []),
     knowledgeBaseUseCase.list(userId).catch(() => []),
   ])
 
-  let docCount = 0
-  try {
-    const docCounts = await Promise.all(
-      kbs.map((kb) =>
-        knowledgeBaseStore.listDocumentsByKb(kb.id).then((docs) => docs.length).catch(() => 0),
-      ),
-    )
-    docCount = docCounts.reduce((a, b) => a + b, 0)
-  } catch { /* non-fatal */ }
+  // documentCount is already included via listByUser's count() join — no per-KB query needed
+  const docCount = kbs.reduce((sum, kb) => sum + (kb.documentCount ?? 0), 0)
 
   let workflowCount = 0
   if (ctx) {

@@ -5,6 +5,8 @@ export interface AgentStorePort {
   findById(id: string): Promise<Agent | null>
   /** T3.3: Workspace-scoped lookup — returns null if the agent exists in a DIFFERENT workspace. */
   findByIdAndWorkspace(id: string, workspaceId: string): Promise<Agent | null>
+  /** Batch workspace-scoped lookup — returns only agents that belong to the given workspace. */
+  findByIdsAndWorkspace(ids: string[], workspaceId: string): Promise<Agent[]>
   findAll(): Promise<Agent[]>
   /** Returns agents where workspaceId matches OR workspaceId IS NULL (legacy agents stay visible). */
   findByWorkspace(workspaceId: string): Promise<Agent[]>

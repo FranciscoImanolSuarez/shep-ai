@@ -107,15 +107,23 @@ export class WorkflowUseCase implements WorkflowPort {
   }
 
   private async validateAgentNodes(definition: WorkflowDefinition, workspaceId: string): Promise<void> {
-    // T3.3: Use findByIdAndWorkspace to enforce workspace isolation during validation.
-    // If an agent exists in a different workspace, it is treated as not found (security: don't
-    // reveal cross-workspace existence). The method returns null for both missing AND
-    // cross-workspace agents, which correctly results in a ValidationError either way.
+    // T3.3: Validate all agent nodes in one batch query (findByIdsAndWorkspace uses inArray).
+    // Agents in a different workspace are excluded, which correctly results in a ValidationError
+    // for cross-workspace agent IDs — same security semantics as the single-lookup version.
     const agentNodes = definition.nodes.filter((n) => n.type === 'agent')
+    if (agentNodes.length === 0) return
+
+    const agentIds = agentNodes.map((n) => {
+      if (n.type !== 'agent') return ''
+      return n.config.agentId
+    }).filter(Boolean)
+
+    const found = await this.agentStore.findByIdsAndWorkspace(agentIds, workspaceId)
+    const foundIds = new Set(found.map((a) => a.id))
+
     for (const node of agentNodes) {
       if (node.type !== 'agent') continue
-      const agent = await this.agentStore.findByIdAndWorkspace(node.config.agentId, workspaceId)
-      if (!agent) {
+      if (!foundIds.has(node.config.agentId)) {
         throw new ValidationError(
           `Agent not found: ${node.config.agentId} (referenced by node ${node.id})`,
         )

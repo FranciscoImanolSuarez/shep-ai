@@ -199,6 +199,7 @@ export class MarketplaceStoreAdapter implements MarketplaceStorePort {
       .select()
       .from(agentInstalls)
       .where(eq(agentInstalls.publishedAgentId, publishedAgentId))
+      .limit(100)
 
     return rows.map(toInstallDomain)
   }

@@ -37,7 +37,7 @@ export class RagUseCase implements RagPort {
       chunkIndex: index,
     }))
 
-    const document: Document & { knowledgeBaseId?: string } = {
+    const document: Document & { content: string; knowledgeBaseId?: string } = {
       id: documentId,
       content: input.content,
       metadata: input.metadata ?? {},

@@ -133,6 +133,7 @@ export class WorkflowStoreAdapter implements WorkflowStorePort {
       .from(workflows)
       .where(eq(workflows.workspaceId, workspaceId))
       .orderBy(desc(workflows.createdAt))
+      .limit(200)
 
     return rows.map(toWorkflowDomain)
   }

@@ -57,6 +57,13 @@
       "when": 1781014910432,
       "tag": "0007_add_mcp_servers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781621637825,
+      "tag": "0008_cute_rick_jones",
+      "breakpoints": true
     }
   ]
 }

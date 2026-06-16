@@ -1,4 +1,4 @@
-import { eq, and, or, isNull } from 'drizzle-orm'
+import { eq, and, or, isNull, inArray } from 'drizzle-orm'
 import type { AgentStorePort } from '@/core/ports/out/agent-store.port'
 import type { Agent } from '@/core/domain/entities/agent'
 import { agents } from './schema'
@@ -39,8 +39,17 @@ export class AgentStoreAdapter implements AgentStorePort {
     return row ? this.toDomain(row) : null
   }
 
+  async findByIdsAndWorkspace(ids: string[], workspaceId: string): Promise<Agent[]> {
+    if (ids.length === 0) return []
+    const rows = await this.db
+      .select()
+      .from(agents)
+      .where(and(inArray(agents.id, ids), eq(agents.workspaceId, workspaceId)))
+    return rows.map((r) => this.toDomain(r))
+  }
+
   async findAll(): Promise<Agent[]> {
-    const rows = await this.db.select().from(agents)
+    const rows = await this.db.select().from(agents).limit(500)
     return rows.map((r) => this.toDomain(r))
   }
 

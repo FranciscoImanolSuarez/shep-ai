@@ -21,24 +21,15 @@ export async function GET(req: Request) {
 
   const { observabilityUseCase } = getContainer()
 
-  const [allTraces, errorTraces] = await Promise.all([
-    observabilityUseCase.listTraces({
-      workspaceId: ctx.workspace.id,
-      startedAfter: from,
-      startedBefore: to,
-      limit: 200,
-    }),
-    observabilityUseCase.listTraces({
-      workspaceId: ctx.workspace.id,
-      status: 'error',
-      startedAfter: from,
-      startedBefore: to,
-      limit: 200,
-    }),
-  ])
+  const allTraces = await observabilityUseCase.listTraces({
+    workspaceId: ctx.workspace.id,
+    startedAfter: from,
+    startedBefore: to,
+    limit: 200,
+  })
 
   const totalTraces = allTraces.length
-  const errorCount = errorTraces.length
+  const errorCount = allTraces.filter((t) => t.status === 'error').length
 
   const completedTraces = allTraces.filter((t) => t.durationMs !== undefined)
   const avgDurationMs =

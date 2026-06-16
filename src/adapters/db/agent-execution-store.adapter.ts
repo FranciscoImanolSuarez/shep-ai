@@ -48,6 +48,7 @@ export class AgentExecutionStoreAdapter implements AgentExecutionStorePort {
       .from(agentExecutions)
       .where(eq(agentExecutions.parentExecutionId, parentId))
       .orderBy(desc(agentExecutions.createdAt))
+      .limit(50)
 
     return rows.map((r) => this.toDomain(r))
   }

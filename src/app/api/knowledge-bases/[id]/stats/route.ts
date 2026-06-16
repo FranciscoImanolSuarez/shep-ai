@@ -9,14 +9,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   const { id } = await params
-  const { knowledgeBaseUseCase } = getContainer()
+  const { knowledgeBaseUseCase, knowledgeBaseStore } = getContainer()
 
   try {
-    const docs = await knowledgeBaseUseCase.listDocuments(session.user.email, id)
+    const [docs, totalChars] = await Promise.all([
+      knowledgeBaseUseCase.listDocuments(session.user.email, id),
+      knowledgeBaseStore.getTotalContentChars(id),
+    ])
 
     const docCount = docs.length
     // Estimate tokens: average ~4 chars per token
-    const totalChars = docs.reduce((sum, d) => sum + (d.content?.length ?? 0), 0)
     const estimatedTokens = Math.round(totalChars / 4)
 
     // Most recent ingestion

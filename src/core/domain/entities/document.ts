@@ -1,6 +1,7 @@
 export interface Document {
   id: string
-  content: string
+  /** Full text — omitted on list queries; available via getDocumentContent(id). */
+  content?: string
   embedding?: number[]
   metadata: Record<string, unknown>
   source: string

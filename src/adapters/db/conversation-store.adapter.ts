@@ -42,6 +42,7 @@ export class ConversationStoreAdapter implements ConversationStorePort {
       .from(conversations)
       .where(eq(conversations.userId, userId))
       .orderBy(desc(conversations.updatedAt))
+      .limit(100)
 
     return rows.map(this.mapConversation)
   }
@@ -113,6 +114,7 @@ export class ConversationStoreAdapter implements ConversationStorePort {
       .from(messages)
       .where(eq(messages.conversationId, conversationId))
       .orderBy(messages.createdAt)
+      .limit(200)
 
     return rows.map(this.mapMessage)
   }

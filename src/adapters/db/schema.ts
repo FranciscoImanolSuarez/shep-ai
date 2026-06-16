@@ -68,7 +68,10 @@ export const documents = pgTable('documents', {
   source: text('source').notNull(),
   metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+}, (table) => [
+  index('idx_documents_knowledge_base_id').on(table.knowledgeBaseId),
+  index('idx_documents_workspace_id').on(table.workspaceId),
+])
 
 export const documentChunks = pgTable('document_chunks', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -104,7 +107,9 @@ export const agents = pgTable('agents', {
   metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (table) => [
+  index('idx_agents_workspace_id').on(table.workspaceId),
+])
 
 export const agentExecutions = pgTable('agent_executions', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -120,7 +125,12 @@ export const agentExecutions = pgTable('agent_executions', {
   traceId: text('trace_id'), // NOT a FK — traces may be cleaned up independently
   createdAt: timestamp('created_at').defaultNow().notNull(),
   completedAt: timestamp('completed_at'),
-})
+}, (table) => [
+  index('idx_agent_executions_agent_id').on(table.agentId),
+  index('idx_agent_executions_parent_execution_id').on(table.parentExecutionId),
+  index('idx_agent_executions_trace_id').on(table.traceId),
+  index('idx_agent_executions_agent_created').on(table.agentId, table.createdAt.desc()),
+])
 
 // --- Scheduled Agents ---
 
@@ -230,6 +240,7 @@ export const agentInstalls = pgTable('agent_installs', {
   installedAt: timestamp('installed_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   uniqueIndex('idx_agent_installs_unique').on(table.publishedAgentId, table.installerId),
+  index('idx_agent_installs_published_agent_id').on(table.publishedAgentId),
 ])
 
 export const agentRatings = pgTable('agent_ratings', {

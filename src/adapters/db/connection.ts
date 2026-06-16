@@ -14,9 +14,7 @@ const client =
     connect_timeout: 10,
   })
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForDb.pgClient = client
-}
+globalForDb.pgClient = client
 
 export function createDb() {
   return drizzle(client, { schema })

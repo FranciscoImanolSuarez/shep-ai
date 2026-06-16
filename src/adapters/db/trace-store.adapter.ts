@@ -185,6 +185,7 @@ export class TraceStoreAdapter implements TraceStorePort {
       .from(spans)
       .where(eq(spans.traceId, traceId))
       .orderBy(spans.startedAt)
+      .limit(500)
 
     return rows.map(toSpanDomain)
   }
