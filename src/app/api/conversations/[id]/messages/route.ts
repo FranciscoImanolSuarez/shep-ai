@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
+
+const addMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().optional(),
+  parts: z.array(z.unknown()).optional(),
+}).refine(
+  (m) => m.content !== undefined || (Array.isArray(m.parts) && m.parts.length > 0),
+  { message: 'content or parts is required' },
+)
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -33,18 +43,15 @@ export async function POST(req: Request, { params }: RouteParams) {
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const { role, content, parts } = body as {
-    role: 'user' | 'assistant' | 'system'
-    content: string
-    parts?: unknown[]
+  const parsed = addMessageSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
 
-  if (!role || !content) {
-    return NextResponse.json(
-      { error: 'role and content are required' },
-      { status: 400 },
-    )
-  }
+  const { role, content, parts } = parsed.data
+  // Derive a string content: prefer explicit content, fall back to empty string
+  // (parts-only messages are stored with an empty content string)
+  const resolvedContent = content ?? ''
 
   const { conversationUseCase } = getContainer()
 
@@ -54,6 +61,6 @@ export async function POST(req: Request, { params }: RouteParams) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const message = await conversationUseCase.addMessage(id, { role, content, parts })
+  const message = await conversationUseCase.addMessage(id, { role, content: resolvedContent, parts })
   return NextResponse.json({ message }, { status: 201 })
 }

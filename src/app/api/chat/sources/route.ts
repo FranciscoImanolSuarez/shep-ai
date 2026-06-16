@@ -1,13 +1,26 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { auth } from '@/lib/auth'
 import { getEnv } from '@/config/env'
 import { getContainer } from '@/config/container'
 
-export async function POST(req: Request) {
-  const { query } = await req.json()
+const sourcesSchema = z.object({
+  query: z.string().min(1),
+})
 
-  if (!query || typeof query !== 'string') {
+export async function POST(req: Request) {
+  const session = await auth()
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await req.json()
+  const parsed = sourcesSchema.safeParse(body)
+  if (!parsed.success) {
     return NextResponse.json({ sources: [] })
   }
+
+  const { query } = parsed.data
 
   const env = getEnv()
   const container = getContainer()

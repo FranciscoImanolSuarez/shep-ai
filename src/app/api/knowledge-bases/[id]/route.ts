@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
+
+const updateKnowledgeBaseSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().max(500).optional(),
+}).refine(
+  (d) => d.name !== undefined || d.description !== undefined,
+  { message: 'At least one of name or description must be provided' },
+)
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -24,7 +33,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params
   const body = await req.json()
-  const { name, description } = body as { name?: string; description?: string }
+  const parsed = updateKnowledgeBaseSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
+  }
+
+  const { name, description } = parsed.data
 
   const { knowledgeBaseUseCase } = getContainer()
 

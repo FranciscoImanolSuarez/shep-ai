@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
 import { WorkspaceForbiddenError, WorkspaceNotFoundError } from '@/core/usecases/workspace.usecase'
+
+const activeWorkspaceSchema = z.object({
+  workspaceId: z.string().uuid(),
+})
 
 export async function PATCH(req: Request) {
   const session = await auth()
@@ -10,15 +15,16 @@ export async function PATCH(req: Request) {
   }
 
   const body = await req.json()
-  const { workspaceId } = body as { workspaceId?: string }
-
-  if (!workspaceId?.trim()) {
-    return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 })
+  const parsed = activeWorkspaceSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
+
+  const { workspaceId } = parsed.data
 
   try {
     const { workspaceUseCase } = getContainer()
-    await workspaceUseCase.setActiveWorkspace(session.user.email, workspaceId.trim())
+    await workspaceUseCase.setActiveWorkspace(session.user.email, workspaceId)
     return NextResponse.json({ success: true })
   } catch (err) {
     if (err instanceof WorkspaceForbiddenError) {

@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getActiveWorkspaceContext } from '@/lib/workspace-context'
 import { getContainer } from '@/config/container'
 import { NotFoundError, ValidationError } from '@/core/usecases/workflow.usecase'
+
+const runWorkflowSchema = z.object({
+  input: z.record(z.string(), z.unknown()).optional(),
+}).optional()
 
 export async function POST(
   req: Request,
@@ -14,16 +19,19 @@ export async function POST(
 
   const { id } = await params
 
-  let body: { input?: unknown } = {}
+  let rawBody: unknown = {}
   try {
-    body = await req.json()
+    rawBody = await req.json()
   } catch {
     // input is optional — empty body is valid
   }
 
-  const input = (body.input != null && typeof body.input === 'object' && !Array.isArray(body.input))
-    ? (body.input as Record<string, unknown>)
-    : {}
+  const parsed = runWorkflowSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
+  }
+
+  const input = parsed.data?.input ?? {}
 
   const { workflowUseCase } = getContainer()
 

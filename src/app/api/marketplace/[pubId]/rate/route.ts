@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
+
+const rateSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+})
 
 export async function POST(
   req: Request,
@@ -13,11 +18,12 @@ export async function POST(
 
   const { pubId } = await params
   const body = await req.json()
-  const { rating } = body
-
-  if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-    return NextResponse.json({ error: 'rating must be an integer between 1 and 5' }, { status: 400 })
+  const parsed = rateSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
+
+  const { rating } = parsed.data
 
   const { marketplaceUseCase } = getContainer()
 
@@ -28,7 +34,6 @@ export async function POST(
     const err = error as Error & { code?: string }
     if (err.code === 'ALREADY_RATED') return NextResponse.json({ error: 'Already rated' }, { status: 409 })
     if (err.message.includes('not found')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    if (err.message.includes('between 1 and 5')) return NextResponse.json({ error: err.message }, { status: 400 })
     throw error
   }
 }

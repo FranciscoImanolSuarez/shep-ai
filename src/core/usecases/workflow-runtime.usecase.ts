@@ -287,7 +287,7 @@ export class WorkflowRuntimeUseCase {
 
       // T2.30: emit workflow.run.completed audit event (fire-and-forget, non-blocking)
       this.auditStore?.record({
-        userId: workspaceId,
+        userId: userId ?? workspaceId,
         eventType: 'workflow.run.completed',
         metadata: {
           runId,
@@ -328,7 +328,7 @@ export class WorkflowRuntimeUseCase {
 
       // T2.30: emit workflow.run.failed audit event (fire-and-forget, non-blocking)
       this.auditStore?.record({
-        userId: workspaceId,
+        userId: userId ?? workspaceId,
         eventType: 'workflow.run.failed',
         metadata: {
           runId,

@@ -2,9 +2,29 @@ import { streamText } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
+import { z } from 'zod'
 import type { UIMessage } from 'ai'
+import { auth } from '@/lib/auth'
 import { getEnv } from '@/config/env'
 import { getContainer } from '@/config/container'
+
+const messagePartSchema = z.union([
+  z.object({ type: z.string(), text: z.string().optional() }),
+  z.record(z.string(), z.unknown()),
+])
+
+const messageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().optional(),
+  parts: z.array(messagePartSchema).optional(),
+}).refine(
+  (m) => m.content !== undefined || (Array.isArray(m.parts) && m.parts.length > 0),
+  { message: 'Each message must have content or parts' },
+)
+
+const chatSchema = z.object({
+  messages: z.array(messageSchema).min(1),
+})
 
 function getModel(provider: string, model: string) {
   switch (provider) {
@@ -33,23 +53,33 @@ function getTextFromUIMessage(m: UIMessage): string {
 }
 
 export async function POST(req: Request) {
-  const { messages } = await req.json()
+  const session = await auth()
+  if (!session?.user?.email) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return new Response(JSON.stringify({ error: 'messages must be a non-empty array' }), {
+  const body = await req.json()
+  const parsed = chatSchema.safeParse(body)
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     })
   }
+
+  const { messages } = parsed.data
 
   const env = getEnv()
 
   // Get the last user message for RAG retrieval
   const lastUserMessage = [...messages]
     .reverse()
-    .find((m: UIMessage) => m.role === 'user')
+    .find((m) => m.role === 'user') as UIMessage | undefined
 
-  const query = getTextFromUIMessage(lastUserMessage)
+  const query = lastUserMessage ? getTextFromUIMessage(lastUserMessage) : ''
 
   // Retrieve relevant context from documents
   const [queryEmbedding] = await getContainer().aiProvider.generateEmbeddings({
@@ -64,10 +94,10 @@ export async function POST(req: Request) {
     .map((r) => r.chunk.content)
     .join('\n\n---\n\n')
 
-  // Convert UIMessages to model messages
-  const modelMessages = messages.map((m: UIMessage) => ({
+  // Convert messages to model messages
+  const modelMessages = messages.map((m) => ({
     role: m.role as 'user' | 'assistant' | 'system',
-    content: getTextFromUIMessage(m),
+    content: getTextFromUIMessage(m as UIMessage),
   }))
 
   const aiModel = getModel(env.AI_PROVIDER, '')

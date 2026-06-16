@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
 import { createDb } from '@/adapters/db/connection'
 import { documents } from '@/adapters/db/schema'
+
+const syncSchema = z.object({
+  documentId: z.string().min(1),
+})
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -15,14 +20,13 @@ export async function POST(req: Request) {
     )
   }
 
-  const { documentId } = (await req.json()) as { documentId: string }
-
-  if (!documentId) {
-    return NextResponse.json(
-      { error: 'documentId is required' },
-      { status: 400 },
-    )
+  const body = await req.json()
+  const parsed = syncSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
+
+  const { documentId } = parsed.data
 
   // Look up the existing document to get the Drive file ID
   const db = createDb()

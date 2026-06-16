@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
 
@@ -6,6 +7,11 @@ import { getContainer } from '@/config/container'
 function estimateChunkCount(content: string): number {
   return Math.ceil(content.length / 462)
 }
+
+const importSchema = z.object({
+  fileIds: z.array(z.string()).min(1),
+  knowledgeBaseId: z.string().min(1),
+})
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -17,22 +23,13 @@ export async function POST(req: Request) {
     )
   }
 
-  const body = (await req.json()) as { fileIds: string[]; knowledgeBaseId?: string }
-  const { fileIds, knowledgeBaseId } = body
-
-  if (!Array.isArray(fileIds) || fileIds.length === 0) {
-    return NextResponse.json(
-      { error: 'fileIds array is required' },
-      { status: 400 },
-    )
+  const body = await req.json()
+  const parsed = importSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
 
-  if (!knowledgeBaseId) {
-    return NextResponse.json(
-      { error: 'knowledgeBaseId is required' },
-      { status: 400 },
-    )
-  }
+  const { fileIds, knowledgeBaseId } = parsed.data
 
   const { ragUseCase, fileSource, auditStore, knowledgeBaseUseCase } = getContainer()
 

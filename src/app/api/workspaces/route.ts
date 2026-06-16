@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
 import { WorkspaceForbiddenError, WorkspaceNotFoundError, WorkspaceConflictError } from '@/core/usecases/workspace.usecase'
+
+const createWorkspaceSchema = z.object({
+  name: z.string().min(1).max(100),
+})
 
 function handleError(err: unknown) {
   if (err instanceof WorkspaceForbiddenError) {
@@ -35,15 +40,16 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json()
-  const { name } = body as { name?: string }
-
-  if (!name?.trim()) {
-    return NextResponse.json({ error: 'name is required' }, { status: 400 })
+  const parsed = createWorkspaceSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
+
+  const { name } = parsed.data
 
   try {
     const { workspaceUseCase } = getContainer()
-    const workspace = await workspaceUseCase.createWorkspace(session.user.email, { name: name.trim() })
+    const workspace = await workspaceUseCase.createWorkspace(session.user.email, { name })
     return NextResponse.json({ workspace }, { status: 201 })
   } catch (err) {
     return handleError(err)

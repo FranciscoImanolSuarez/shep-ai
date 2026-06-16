@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
 import { WorkspaceForbiddenError, WorkspaceNotFoundError } from '@/core/usecases/workspace.usecase'
+
+const transferSchema = z.object({
+  newOwnerId: z.string().min(1),
+})
 
 function handleError(err: unknown) {
   if (err instanceof WorkspaceForbiddenError) {
@@ -24,15 +29,16 @@ export async function PATCH(
 
   const { wsId } = await params
   const body = await req.json()
-  const { newOwnerId } = body as { newOwnerId?: string }
-
-  if (!newOwnerId?.trim()) {
-    return NextResponse.json({ error: 'newOwnerId is required' }, { status: 400 })
+  const parsed = transferSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
+
+  const { newOwnerId } = parsed.data
 
   try {
     const { workspaceUseCase } = getContainer()
-    await workspaceUseCase.transferOwnership(session.user.email, wsId, newOwnerId.trim())
+    await workspaceUseCase.transferOwnership(session.user.email, wsId, newOwnerId)
     return NextResponse.json({ success: true })
   } catch (err) {
     return handleError(err)

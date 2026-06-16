@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getContainer } from '@/config/container'
+
+const createKnowledgeBaseSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().max(500).optional(),
+})
 
 export async function GET() {
   const session = await auth()
@@ -21,14 +27,15 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json()
-  const { name, description } = body as { name?: string; description?: string }
-
-  if (!name?.trim()) {
-    return NextResponse.json({ error: 'name is required' }, { status: 400 })
+  const parsed = createKnowledgeBaseSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
 
+  const { name, description } = parsed.data
+
   const { knowledgeBaseUseCase } = getContainer()
-  const kb = await knowledgeBaseUseCase.create(session.user.email, { name: name.trim(), description })
+  const kb = await knowledgeBaseUseCase.create(session.user.email, { name, description })
 
   return NextResponse.json(kb, { status: 201 })
 }
