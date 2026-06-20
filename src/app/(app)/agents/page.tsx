@@ -5,7 +5,6 @@ import {
   BotIcon,
   PlusIcon,
   TrashIcon,
-  PlayIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   ChevronRightIcon,
@@ -19,6 +18,10 @@ import {
   ClockIcon,
   PlugIcon,
   WrenchIcon,
+  XIcon,
+  CheckCircle2Icon,
+  ArrowUpRightIcon,
+  ZapIcon,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
@@ -155,9 +158,9 @@ function resolveToolPills(toolIds: string[], agents: AgentData[]): ToolPillData[
 
 function ToolPill({ label, Icon }: { label: string; Icon: LucideIcon }) {
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-secondary/70 border border-border/50 rounded-full pl-1.5 pr-2 py-0.5">
-      <Icon className="size-2.5 shrink-0" strokeWidth={2} />
-      <span className="truncate max-w-[120px]">{label}</span>
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted/60 hover:bg-muted rounded-md px-2 py-1 transition-colors">
+      <Icon className="size-2.5 shrink-0 text-muted-foreground/70" strokeWidth={2} />
+      <span className="truncate max-w-[100px]">{label}</span>
     </span>
   )
 }
@@ -168,17 +171,28 @@ const PROVIDER_DOT: Record<AgentData['provider'], string> = {
   ollama: 'bg-violet-500',
 }
 
-// Distinct, deterministic avatar per agent — initials on a colour seeded by id,
-// so every card is instantly recognisable instead of an identical bot icon.
-const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500',
-  'bg-cyan-600', 'bg-indigo-500', 'bg-orange-500', 'bg-teal-500', 'bg-fuchsia-500',
+// Distinct palette — each entry has an avatar bg and a matching stripe/ring shade.
+const AGENT_PALETTE = [
+  { avatar: 'bg-blue-500',    stripe: 'bg-blue-500',    ring: 'ring-blue-200 dark:ring-blue-800' },
+  { avatar: 'bg-emerald-500', stripe: 'bg-emerald-500', ring: 'ring-emerald-200 dark:ring-emerald-800' },
+  { avatar: 'bg-violet-500',  stripe: 'bg-violet-500',  ring: 'ring-violet-200 dark:ring-violet-800' },
+  { avatar: 'bg-amber-500',   stripe: 'bg-amber-500',   ring: 'ring-amber-200 dark:ring-amber-800' },
+  { avatar: 'bg-rose-500',    stripe: 'bg-rose-500',    ring: 'ring-rose-200 dark:ring-rose-800' },
+  { avatar: 'bg-cyan-600',    stripe: 'bg-cyan-600',    ring: 'ring-cyan-200 dark:ring-cyan-800' },
+  { avatar: 'bg-indigo-500',  stripe: 'bg-indigo-500',  ring: 'ring-indigo-200 dark:ring-indigo-800' },
+  { avatar: 'bg-orange-500',  stripe: 'bg-orange-500',  ring: 'ring-orange-200 dark:ring-orange-800' },
+  { avatar: 'bg-teal-500',    stripe: 'bg-teal-500',    ring: 'ring-teal-200 dark:ring-teal-800' },
+  { avatar: 'bg-fuchsia-500', stripe: 'bg-fuchsia-500', ring: 'ring-fuchsia-200 dark:ring-fuchsia-800' },
 ]
 
 function hashString(s: string): number {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0
   return Math.abs(h)
+}
+
+function agentPalette(seed: string) {
+  return AGENT_PALETTE[hashString(seed) % AGENT_PALETTE.length]
 }
 
 function agentInitials(name: string): string {
@@ -189,9 +203,9 @@ function agentInitials(name: string): string {
 }
 
 function InitialsAvatar({ name, seed }: { name: string; seed: string }) {
-  const color = AVATAR_COLORS[hashString(seed) % AVATAR_COLORS.length]
+  const { avatar } = agentPalette(seed)
   return (
-    <div className={`size-10 rounded-lg shrink-0 flex items-center justify-center text-white text-[13px] font-semibold tracking-tight ${color}`}>
+    <div className={`size-9 rounded-xl shrink-0 flex items-center justify-center text-white text-[12px] font-bold tracking-wide ${avatar}`}>
       {agentInitials(name)}
     </div>
   )
@@ -256,16 +270,15 @@ function AgentStatsRow({ agentId }: { agentId: string }) {
         : 'bg-red-500'
 
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <span className="tabular-nums">{stats.totalRuns} run{stats.totalRuns !== 1 ? 's' : ''}</span>
+    <div className="flex items-center gap-2 text-[11px] text-muted-foreground/70">
+      <span className="tabular-nums font-medium">{stats.totalRuns}</span>
+      <span className="text-muted-foreground/30">runs</span>
       {stats.totalRuns > 0 && (
         <>
-          <span className="text-muted-foreground/40">·</span>
-          <span className="inline-flex items-center gap-1 tabular-nums">
-            <span className={`size-1.5 rounded-full shrink-0 ${rateColor}`} />
-            {stats.successRate}%
-          </span>
-          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground/30">·</span>
+          <span className={`size-1.5 rounded-full shrink-0 ${rateColor}`} />
+          <span className="tabular-nums">{stats.successRate}%</span>
+          <span className="text-muted-foreground/30">·</span>
           <span>{relativeTime(stats.lastRunAt)}</span>
         </>
       )}
@@ -315,26 +328,34 @@ function AgentCard({
     }
   }
 
+  const palette = agentPalette(agent.id)
+
   return (
-    <div className="border border-border bg-card rounded-xl hover:border-foreground/30 hover:shadow-md transition-all flex flex-col">
-      {/* Card header */}
-      <div className="p-4 flex-1">
-        <div className="flex items-start gap-3 mb-3">
+    <div className="group relative bg-card rounded-2xl border border-border/60 hover:border-border hover:shadow-lg transition-all duration-200 flex flex-col overflow-hidden">
+
+      {/* Coloured top stripe — unique identity per agent */}
+      <div className={`h-[3px] w-full ${palette.stripe} shrink-0`} />
+
+      {/* Card body */}
+      <div className="p-5 flex-1 flex flex-col gap-4">
+
+        {/* Header row */}
+        <div className="flex items-start gap-3">
           <InitialsAvatar name={agent.name} seed={agent.id} />
           <div className="flex-1 min-w-0">
             <Link
               href={`/agents/${agent.id}`}
-              className="text-sm font-semibold leading-tight truncate hover:text-primary transition-colors block"
+              className="text-[15px] font-semibold leading-snug truncate hover:text-primary transition-colors block"
             >
               {agent.name}
             </Link>
-            <div className="flex items-center gap-1.5 mt-1 min-w-0 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
               <span className={`size-1.5 rounded-full shrink-0 ${PROVIDER_DOT[agent.provider]}`} />
-              <span className="truncate font-mono text-[11px]">{agent.model}</span>
+              <span className="text-[11px] font-mono text-muted-foreground truncate capitalize">{agent.provider} · {agent.model}</span>
             </div>
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger className="p-1 rounded hover:bg-muted transition-colors shrink-0">
+            <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-muted transition-all shrink-0">
               <MoreHorizontalIcon className="size-4 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -346,21 +367,18 @@ function AgentCard({
                 <CopyIcon className="size-3.5" />
                 Duplicate
               </DropdownMenuItem>
-              {!isPublished && (
+              {!isPublished ? (
                 <DropdownMenuItem onClick={() => onPublish(agent)}>
                   <UploadIcon className="size-3.5" />
                   Publish to marketplace
                 </DropdownMenuItem>
-              )}
-              {isPublished && (
+              ) : (
                 <DropdownMenuItem disabled>
+                  <CheckCircle2Icon className="size-3.5" />
                   Published
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem
-                onClick={() => onDelete(agent.id)}
-                variant="destructive"
-              >
+              <DropdownMenuItem onClick={() => onDelete(agent.id)} variant="destructive">
                 <TrashIcon className="size-3.5" />
                 Delete
               </DropdownMenuItem>
@@ -368,60 +386,68 @@ function AgentCard({
           </DropdownMenu>
         </div>
 
-        <p className={`text-xs line-clamp-2 mb-3 leading-relaxed ${agent.description ? 'text-muted-foreground' : 'text-muted-foreground/40 italic'}`}>
-          {agent.description || 'No description'}
+        {/* Description */}
+        <p className={`text-[13px] leading-relaxed line-clamp-2 -mt-1 ${agent.description ? 'text-muted-foreground' : 'text-muted-foreground/40 italic'}`}>
+          {agent.description || 'No description yet'}
         </p>
 
         {/* Tool pills */}
         {agent.toolIds.length > 0 && (() => {
           const pills = resolveToolPills(agent.toolIds, agents)
-          const shown = pills.slice(0, 4)
+          const shown = pills.slice(0, 3)
           const extra = pills.length - shown.length
           return (
-            <div className="flex flex-wrap items-center gap-1 mb-3">
+            <div className="flex flex-wrap items-center gap-1.5">
               {shown.map((p) => <ToolPill key={p.key} label={p.label} Icon={p.Icon} />)}
               {extra > 0 && (
-                <span className="text-[10px] text-muted-foreground px-1">+{extra} more</span>
+                <span className="text-[10px] text-muted-foreground/70 font-medium">+{extra}</span>
               )}
             </div>
           )
         })()}
-
-        {/* Stats */}
-        <AgentStatsRow agentId={agent.id} />
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-border px-4 py-2.5">
-        <button
-          onClick={() => {
-            setExpanded((v) => !v)
-            if (!expanded) { setRunOutput(''); setChildExecutions([]); setRunMeta(null) }
-          }}
-          className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-muted hover:border-foreground/20 transition-colors"
-        >
-          <PlayIcon className="size-3" />
-          {expanded ? 'Close' : 'Quick run'}
-          {expanded ? <ChevronUpIcon className="size-3 ml-auto" /> : <ChevronDownIcon className="size-3 ml-auto" />}
-        </button>
+      {/* Footer: stats (left) + actions (right) */}
+      <div className="border-t border-border/60 px-5 py-3 flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <AgentStatsRow agentId={agent.id} />
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Link
+            href={`/agents/${agent.id}`}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Edit agent"
+          >
+            <ArrowUpRightIcon className="size-3.5" />
+          </Link>
+          <button
+            onClick={() => {
+              setExpanded((v) => !v)
+              if (!expanded) { setRunOutput(''); setChildExecutions([]); setRunMeta(null) }
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${expanded ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+            title={expanded ? 'Close run panel' : 'Quick run'}
+          >
+            {expanded ? <XIcon className="size-3.5" /> : <ZapIcon className="size-3.5" />}
+          </button>
+        </div>
       </div>
 
-      {/* Expanded run panel */}
+      {/* Expandable run panel */}
       {expanded && (
-        <div className="border-t border-border px-4 py-3 space-y-3 bg-secondary/30 rounded-b-xl">
+        <div className="border-t border-border/60 bg-muted/30 px-5 py-4 space-y-3 rounded-b-2xl">
           {agent.systemPrompt && (
-            <div>
-              <p className="text-[11px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">System prompt</p>
-              <p className="text-xs bg-secondary rounded-md p-2 whitespace-pre-wrap line-clamp-3">{agent.systemPrompt}</p>
+            <div className="text-[11px] text-muted-foreground bg-background border border-border/60 rounded-lg px-3 py-2 line-clamp-2 leading-relaxed">
+              {agent.systemPrompt}
             </div>
           )}
-          <div className="space-y-2">
+          <div className="flex gap-2">
             <textarea
               value={runInput}
               onChange={(e) => setRunInput(e.target.value)}
-              placeholder="Enter input… (⌘↵ to run)"
+              placeholder="Message… (⌘↵ to run)"
               rows={2}
-              className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              className="flex-1 px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring transition-all"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleRun() }
               }}
@@ -430,33 +456,32 @@ function AgentCard({
             <button
               onClick={handleRun}
               disabled={runningId || !runInput.trim()}
-              className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+              className="self-end px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-30 flex items-center gap-1.5"
             >
-              {runningId ? <Spinner size="sm" /> : <PlayIcon className="size-3" />}
-              {runningId ? 'Running…' : 'Run agent'}
+              {runningId ? <Spinner size="sm" /> : <ZapIcon className="size-3.5" />}
             </button>
           </div>
 
           {runOutput && (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {runMeta && (runMeta.tokens != null || runMeta.steps != null) && (
                 <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                  {runMeta.tokens != null && <span>{runMeta.tokens.toLocaleString()} tokens</span>}
+                  {runMeta.tokens != null && <span className="tabular-nums">{runMeta.tokens.toLocaleString()} tokens</span>}
                   {runMeta.steps != null && <span>{runMeta.steps} step{runMeta.steps !== 1 ? 's' : ''}</span>}
                 </div>
               )}
-              <pre className="text-xs bg-secondary rounded-md p-3 whitespace-pre-wrap max-h-48 overflow-auto">
+              <pre className="text-xs bg-background border border-border/60 rounded-xl px-3 py-2.5 whitespace-pre-wrap max-h-48 overflow-auto leading-relaxed">
                 {runOutput}
               </pre>
             </div>
           )}
 
           {childExecutions.length > 0 && (
-            <div className="space-y-0.5">
-              <p className="text-[11px] font-medium text-muted-foreground mt-1">
-                Sub-Agent Executions ({childExecutions.length})
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground">
+                Sub-agents ({childExecutions.length})
               </p>
-              <div className="rounded-md border border-border/60 p-2 space-y-0.5">
+              <div className="rounded-xl border border-border/60 bg-background p-2 space-y-0.5">
                 {childExecutions.map((child) => (
                   <ChildExecutionCard key={child.id} execution={child} agents={agents} />
                 ))}
