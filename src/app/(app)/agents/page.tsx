@@ -205,7 +205,7 @@ function agentInitials(name: string): string {
 function InitialsAvatar({ name, seed }: { name: string; seed: string }) {
   const { avatar } = agentPalette(seed)
   return (
-    <div className={`size-9 rounded-xl shrink-0 flex items-center justify-center text-white text-[12px] font-bold tracking-wide ${avatar}`}>
+    <div className={`size-11 rounded-xl shrink-0 flex items-center justify-center text-white text-[13px] font-bold tracking-wide select-none ${avatar}`}>
       {agentInitials(name)}
     </div>
   )
@@ -328,67 +328,62 @@ function AgentCard({
     }
   }
 
-  const palette = agentPalette(agent.id)
-
   return (
-    <div className="group relative bg-card rounded-2xl border border-border/60 hover:border-border hover:shadow-lg transition-all duration-200 flex flex-col overflow-hidden">
+    <div className="group bg-card rounded-xl border border-border hover:shadow-[0_2px_12px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_2px_12px_rgba(0,0,0,0.3)] hover:-translate-y-px transition-all duration-150 flex flex-col">
 
-      {/* Coloured top stripe — unique identity per agent */}
-      <div className={`h-[3px] w-full ${palette.stripe} shrink-0`} />
+      {/* Body */}
+      <div className="p-6 flex-1 flex flex-col gap-5">
 
-      {/* Card body */}
-      <div className="p-5 flex-1 flex flex-col gap-4">
-
-        {/* Header row */}
-        <div className="flex items-start gap-3">
-          <InitialsAvatar name={agent.name} seed={agent.id} />
-          <div className="flex-1 min-w-0">
-            <Link
-              href={`/agents/${agent.id}`}
-              className="text-[15px] font-semibold leading-snug truncate hover:text-primary transition-colors block"
-            >
-              {agent.name}
-            </Link>
-            <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-              <span className={`size-1.5 rounded-full shrink-0 ${PROVIDER_DOT[agent.provider]}`} />
-              <span className="text-[11px] font-mono text-muted-foreground truncate capitalize">{agent.provider} · {agent.model}</span>
+        {/* Header: avatar + name/model + menu */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-4 min-w-0">
+            <InitialsAvatar name={agent.name} seed={agent.id} />
+            <div className="min-w-0">
+              <Link
+                href={`/agents/${agent.id}`}
+                className="text-[15px] font-semibold leading-tight hover:underline underline-offset-2 block truncate"
+              >
+                {agent.name}
+              </Link>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className={`size-1.5 rounded-full shrink-0 ${PROVIDER_DOT[agent.provider]}`} />
+                <span className="text-[12px] text-muted-foreground capitalize">{agent.provider}</span>
+                <span className="text-muted-foreground/40 text-[12px]">·</span>
+                <span className="text-[12px] text-muted-foreground font-mono truncate">{agent.model}</span>
+              </div>
             </div>
           </div>
+
           <DropdownMenu>
-            <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-muted transition-all shrink-0">
-              <MoreHorizontalIcon className="size-4 text-muted-foreground" />
+            <DropdownMenuTrigger className="shrink-0 mt-0.5 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-0">
+              <MoreHorizontalIcon className="size-[18px]" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem render={<Link href={`/agents/${agent.id}`} />}>
-                <PencilIcon className="size-3.5" />
-                Edit
+                <PencilIcon className="size-3.5" /> Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onClone(agent)}>
-                <CopyIcon className="size-3.5" />
-                Duplicate
+                <CopyIcon className="size-3.5" /> Duplicate
               </DropdownMenuItem>
               {!isPublished ? (
                 <DropdownMenuItem onClick={() => onPublish(agent)}>
-                  <UploadIcon className="size-3.5" />
-                  Publish to marketplace
+                  <UploadIcon className="size-3.5" /> Publish to marketplace
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem disabled>
-                  <CheckCircle2Icon className="size-3.5" />
-                  Published
+                  <CheckCircle2Icon className="size-3.5" /> Published
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={() => onDelete(agent.id)} variant="destructive">
-                <TrashIcon className="size-3.5" />
-                Delete
+                <TrashIcon className="size-3.5" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
         {/* Description */}
-        <p className={`text-[13px] leading-relaxed line-clamp-2 -mt-1 ${agent.description ? 'text-muted-foreground' : 'text-muted-foreground/40 italic'}`}>
-          {agent.description || 'No description yet'}
+        <p className={`text-sm leading-relaxed line-clamp-2 ${agent.description ? 'text-muted-foreground' : 'text-muted-foreground/40 italic'}`}>
+          {agent.description || 'No description'}
         </p>
 
         {/* Tool pills */}
@@ -400,54 +395,54 @@ function AgentCard({
             <div className="flex flex-wrap items-center gap-1.5">
               {shown.map((p) => <ToolPill key={p.key} label={p.label} Icon={p.Icon} />)}
               {extra > 0 && (
-                <span className="text-[10px] text-muted-foreground/70 font-medium">+{extra}</span>
+                <span className="text-[11px] text-muted-foreground/60">+{extra}</span>
               )}
             </div>
           )
         })()}
       </div>
 
-      {/* Footer: stats (left) + actions (right) */}
-      <div className="border-t border-border/60 px-5 py-3 flex items-center gap-3">
+      {/* Footer */}
+      <div className="border-t border-border/60 px-6 py-3.5 flex items-center gap-2">
         <div className="flex-1 min-w-0">
           <AgentStatsRow agentId={agent.id} />
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
           <Link
             href={`/agents/${agent.id}`}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Edit agent"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Open agent"
           >
-            <ArrowUpRightIcon className="size-3.5" />
+            <ArrowUpRightIcon className="size-4" />
           </Link>
           <button
             onClick={() => {
               setExpanded((v) => !v)
               if (!expanded) { setRunOutput(''); setChildExecutions([]); setRunMeta(null) }
             }}
-            className={`p-1.5 rounded-lg transition-colors ${expanded ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-            title={expanded ? 'Close run panel' : 'Quick run'}
+            title={expanded ? 'Close' : 'Quick run'}
+            className={`p-1.5 rounded-md transition-colors ${expanded ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
           >
-            {expanded ? <XIcon className="size-3.5" /> : <ZapIcon className="size-3.5" />}
+            {expanded ? <XIcon className="size-4" /> : <ZapIcon className="size-4" />}
           </button>
         </div>
       </div>
 
-      {/* Expandable run panel */}
+      {/* Run panel */}
       {expanded && (
-        <div className="border-t border-border/60 bg-muted/30 px-5 py-4 space-y-3 rounded-b-2xl">
+        <div className="border-t border-border/60 px-6 py-4 space-y-3 bg-muted/20 rounded-b-xl">
           {agent.systemPrompt && (
-            <div className="text-[11px] text-muted-foreground bg-background border border-border/60 rounded-lg px-3 py-2 line-clamp-2 leading-relaxed">
+            <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 bg-background border border-border/60 rounded-lg px-3 py-2">
               {agent.systemPrompt}
-            </div>
+            </p>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-end">
             <textarea
               value={runInput}
               onChange={(e) => setRunInput(e.target.value)}
               placeholder="Message… (⌘↵ to run)"
               rows={2}
-              className="flex-1 px-3 py-2 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring transition-all"
+              className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/30 transition-all"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleRun() }
               }}
@@ -456,21 +451,21 @@ function AgentCard({
             <button
               onClick={handleRun}
               disabled={runningId || !runInput.trim()}
-              className="self-end px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-30 flex items-center gap-1.5"
+              className="shrink-0 h-[68px] px-3 rounded-lg bg-foreground text-background text-sm font-medium hover:bg-foreground/90 disabled:opacity-30 transition-opacity flex items-center justify-center"
             >
-              {runningId ? <Spinner size="sm" /> : <ZapIcon className="size-3.5" />}
+              {runningId ? <Spinner size="sm" /> : <ZapIcon className="size-4" />}
             </button>
           </div>
 
           {runOutput && (
             <div className="space-y-1.5">
-              {runMeta && (runMeta.tokens != null || runMeta.steps != null) && (
+              {runMeta && (
                 <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                   {runMeta.tokens != null && <span className="tabular-nums">{runMeta.tokens.toLocaleString()} tokens</span>}
                   {runMeta.steps != null && <span>{runMeta.steps} step{runMeta.steps !== 1 ? 's' : ''}</span>}
                 </div>
               )}
-              <pre className="text-xs bg-background border border-border/60 rounded-xl px-3 py-2.5 whitespace-pre-wrap max-h-48 overflow-auto leading-relaxed">
+              <pre className="text-xs bg-background border border-border/60 rounded-lg px-3 py-2.5 whitespace-pre-wrap max-h-48 overflow-auto leading-relaxed">
                 {runOutput}
               </pre>
             </div>
@@ -478,10 +473,8 @@ function AgentCard({
 
           {childExecutions.length > 0 && (
             <div className="space-y-1">
-              <p className="text-[11px] font-medium text-muted-foreground">
-                Sub-agents ({childExecutions.length})
-              </p>
-              <div className="rounded-xl border border-border/60 bg-background p-2 space-y-0.5">
+              <p className="text-[11px] font-medium text-muted-foreground">Sub-agents ({childExecutions.length})</p>
+              <div className="rounded-lg border border-border/60 bg-background p-2 space-y-0.5">
                 {childExecutions.map((child) => (
                   <ChildExecutionCard key={child.id} execution={child} agents={agents} />
                 ))}
