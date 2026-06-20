@@ -260,9 +260,9 @@ export function ChatInterface({ conversation, initialMessages }: ChatInterfacePr
       {/* Messages area */}
       <ConversationView className="flex-1">
         <ConversationContent>
-          <div className="max-w-3xl mx-auto px-6 py-8">
+          <div className="max-w-3xl mx-auto px-6 py-8 min-h-full flex flex-col justify-end">
             {isEmpty ? (
-              <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
+              <div className="flex-1 min-h-[60vh] flex flex-col items-center justify-center text-center">
                 <div className="size-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center mb-6">
                   <SparklesIcon className="size-6 text-primary" strokeWidth={2} />
                 </div>

@@ -36,25 +36,23 @@ export const MessageBubble = memo(function MessageBubble({
 
   if (role === 'user') {
     return (
-      <div className="flex justify-end my-5 group">
-        <div className="max-w-[80%] sm:max-w-[70%] flex flex-col items-end">
-          <div className="rounded-2xl rounded-br-md bg-primary text-primary-foreground px-4 py-2.5 shadow-sm">
-            <div className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">{content}</div>
-          </div>
-          <div className="flex items-center gap-2 mt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {timestamp && (
-              <span className="text-[10px] text-muted-foreground font-mono">{timestamp}</span>
-            )}
-            {onCopy && (
-              <button
-                onClick={onCopy}
-                aria-label="Copy message"
-                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-muted"
-              >
-                <CopyIcon className="size-3" />
-              </button>
-            )}
-          </div>
+      <div className="flex flex-col items-end my-5 group">
+        <div className="w-fit max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-br-md bg-primary text-primary-foreground px-4 py-2.5 shadow-sm">
+          <div className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">{content}</div>
+        </div>
+        <div className="flex items-center gap-2 mt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {timestamp && (
+            <span className="text-[10px] text-muted-foreground font-mono">{timestamp}</span>
+          )}
+          {onCopy && (
+            <button
+              onClick={onCopy}
+              aria-label="Copy message"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-muted"
+            >
+              <CopyIcon className="size-3" />
+            </button>
+          )}
         </div>
       </div>
     )
