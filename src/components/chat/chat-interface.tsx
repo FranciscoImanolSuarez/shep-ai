@@ -2,7 +2,7 @@
 
 import { useChat } from '@ai-sdk/react'
 import { TextStreamChatTransport } from 'ai'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { UIMessage } from 'ai'
 import type { Conversation, ConversationMessage } from '@/core/domain/entities/conversation'
 import {
@@ -130,6 +130,33 @@ export function ChatInterface({ conversation, initialMessages }: ChatInterfacePr
   const [composerText, setComposerText] = useState('')
   const [isListening, setIsListening] = useState(false)
 
+  // Keep a ref in sync so the per-request body and onFinish always read the
+  // CURRENT RAG state — not the value captured when useChat/handleSubmit were
+  // first created (the transport body is frozen at init, which is why toggling
+  // RAG previously did nothing).
+  const useRagRef = useRef(useRag)
+  useEffect(() => { useRagRef.current = useRag }, [useRag])
+
+  // Toggle document search and persist it to the conversation so it survives
+  // reloads (mirrors how the model selection is persisted).
+  const toggleRag = useCallback(async () => {
+    const next = !useRagRef.current
+    setUseRag(next)
+    useRagRef.current = next
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ useRag: next }),
+      })
+      if (!res.ok) throw new Error('patch failed')
+    } catch {
+      setUseRag(!next)
+      useRagRef.current = !next
+      toast.error('Failed to update document search')
+    }
+  }, [conversationId])
+
   const handleModelChange = useCallback(async (modelId: string) => {
     const previous = activeModel
     setActiveModel(modelId)
@@ -163,7 +190,7 @@ export function ChatInterface({ conversation, initialMessages }: ChatInterfacePr
           await updateTitle(conversationId, title)
         }
 
-        if (useRag) {
+        if (useRagRef.current) {
           try {
             const res = await fetch('/api/chat/sources', {
               method: 'POST',
@@ -193,14 +220,14 @@ export function ChatInterface({ conversation, initialMessages }: ChatInterfacePr
       const trimmed = text.trim()
       if (!trimmed) return
       pendingUserTextRef.current = trimmed
-      sendMessage({ text: trimmed })
+      sendMessage({ text: trimmed }, { body: { useRag: useRagRef.current } })
     },
     [sendMessage],
   )
 
   const handleStarter = useCallback((prompt: string) => {
     pendingUserTextRef.current = prompt
-    sendMessage({ text: prompt })
+    sendMessage({ text: prompt }, { body: { useRag: useRagRef.current } })
   }, [sendMessage])
 
   const isStreaming = status === 'streaming' || status === 'submitted'
@@ -453,7 +480,7 @@ export function ChatInterface({ conversation, initialMessages }: ChatInterfacePr
                   </button>
                   <button
                     type="button"
-                    onClick={() => setUseRag(!useRag)}
+                    onClick={toggleRag}
                     aria-pressed={useRag}
                     title={useRag ? 'RAG enabled — agent searches your documents' : 'Enable RAG to search documents'}
                     className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full text-xs font-medium border transition-all ${
